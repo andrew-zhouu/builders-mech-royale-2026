@@ -69,9 +69,22 @@ func (b *Bot) think(act *proto.Action) {
 		// match. Practice never gets here, so whatever the build scores in practice stays as it is.
 		b.swapped = true
 		if f := Variants()[b.P.FFASwap]; f != nil {
+			b.pFFABase = b.P
 			q := b.P
 			f(&q)
 			q.FFASwap = ""
+			q.FFALate, q.FFALateT, q.Salt = b.P.FFALate, b.P.FFALateT, b.P.Salt
+			b.P = q
+			st = b.belief()
+		}
+	}
+	if b.swapped && !b.lateDone && b.P.FFALate != "" && b.t >= b.P.FFALateT {
+		// ... and a second set for the rest of the match, once the opening is behind us
+		b.lateDone = true
+		if f := Variants()[b.P.FFALate]; f != nil {
+			q := b.pFFABase
+			f(&q)
+			q.FFASwap, q.FFALate, q.OpenSet, q.SquadSet = "", "", "", ""
 			b.P = q
 			st = b.belief()
 		}

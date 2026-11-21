@@ -77,7 +77,7 @@ func (b *Bot) belief() stance {
 		}
 	}
 	alive := b.o.Alive
-	if b.P.ForceFFA {
+	if b.P.ForceFFA || b.soundFFA {
 		b.ffa = true
 	}
 	// The seat tells: in every public lobby with house bots (60 recorded) the players sit in the lowest

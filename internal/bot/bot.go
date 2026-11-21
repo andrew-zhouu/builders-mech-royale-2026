@@ -43,6 +43,10 @@ type Params struct {
 	NpcGiveUp     float64 // the same for a drone we are trying to shoot
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
+	SoundFFA      int     // gun shots from each of two well separated directions in the opening that mean a free-for-all (0 = off)
+	SoundFFAUntil float64 // ... heard before this match time
+	FFALate       string  // variant applied (to the set FFASwap started from) once FFALateT has passed in a free-for-all ("" = none)
+	FFALateT      float64
 	FFASwap       string  // variant to switch to once the lobby is known to be a free-for-all ("" = none)
 	OpenSet       string  // variant in force from the start until the lobby is known or assumed ("" = none)
 	SquadSet      string  // variant in force while the lobby is taken to be practice ("" = none)
@@ -151,7 +155,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "p74b"
+var BuildVariant = "p74c"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -439,6 +443,10 @@ type Bot struct {
 	deepCell   int     // retreat: the next place deeper into cover we are walking to (-1 none)
 	deepT      float64 // ... when we chose it
 	deepTryT   float64 // ... when we last looked for one
+	gunSector   [12]int // SoundFFA: gun shots heard so far, by direction (30 degree sectors)
+	soundFFA    bool    // SoundFFA: the opening sounded like a free-for-all
+	lateDone    bool    // FFALate has been applied
+	pFFABase    Params  // the parameters FFASwap was applied to (FFALate starts from them again)
 	swapped     bool    // FFASwap has been applied
 	healing     bool    // HealFirst: hurt and letting the health come back before farming again
 	crateTryID  int     // the crate (or drone) we are working on, when we started and its health then
@@ -1045,6 +1053,28 @@ func (b *Bot) observe(o *proto.Obs) {
 			if sd.Dist != "far" {
 				b.lastSoundT = b.t - sd.Age
 				b.lastSoundB = sd.Bearing
+			}
+		}
+		// Gunfire all around in the first seconds (SoundFFA). In a free-for-all 15 mechs start
+		// shooting crates at once: within 5 s 70% of mechs in the recorded matches had heard two
+		// shots or more from each of two directions 60 degrees apart. One hunter coming for us
+		// cannot sound like that. Only until we are first hit, and not the shots right beside us.
+		if b.P.SoundFFA > 0 && !b.soundFFA && sd.Kind == "gun" && sd.Dist != "near" && b.t < b.P.SoundFFAUntil && b.lastWeaponDT < 0 {
+			k := int(math.Floor((sd.Bearing+math.Pi)/(math.Pi/6))) % 12
+			if k < 0 {
+				k += 12
+			}
+			b.gunSector[k]++
+			for a := 0; a < 12 && !b.soundFFA; a++ {
+				if b.gunSector[a] < b.P.SoundFFA {
+					continue
+				}
+				for c := a + 3; c <= a+9; c++ { // sectors at least 60 degrees clear of each other
+					if b.gunSector[c%12] >= b.P.SoundFFA {
+						b.soundFFA = true
+						break
+					}
+				}
 			}
 		}
 	}

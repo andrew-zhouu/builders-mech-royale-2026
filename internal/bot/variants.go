@@ -137,6 +137,14 @@ func Variants() map[string]func(p *Params) {
 			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
 			p.HealFirst, p.HealUntil = 0.75, 0.95
 		},
+		// p74c = p74b with the v0.5 play (path fix in) from detection to 50 s, and detection by the
+		// gunfire of the opening as well as by deaths; p74d = the same without the gunfire detector
+		"p74c": func(p *Params) {
+			v074(p)
+			p.SoundFFA, p.SoundFFAUntil = 2, 10
+			p.FFASwap, p.FFALate, p.FFALateT = "v05fix", "ffa-fixrf", 50
+		},
+		"p74d": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fix", "ffa-fixrf", 50 },
 		"p74a": func(p *Params) { v074(p); p.FFASwap = "ffa-fix" },
 		"p74b": func(p *Params) { v074(p); p.FFASwap = "ffa-fixrf" },
 		// roof first, farm later: the v0.5 opening, then this build with roofs wanted at once
