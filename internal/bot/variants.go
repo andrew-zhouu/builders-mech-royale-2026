@@ -126,6 +126,19 @@ func Variants() map[string]func(p *Params) {
 		"h-v05fix":   func(p *Params) { p.FFASwap = "v05fix" },
 		// ... and with the v0.5 opening as well: h3 = v0.5 opening then this build, h3s = v0.5 opening,
 		// v0.5 in a free-for-all, this build only against the practice squad
+		// v0.7.4 to the letter until a free-for-all is known (so its practice score, 6.23, stays), then:
+		// p74a = the three fixes from its real matches; p74b = those, the roof first with farming once
+		// it is quiet, and healing before farming
+		"ffa-fix": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+		},
+		"ffa-fixrf": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+		},
+		"p74a": func(p *Params) { v074(p); p.FFASwap = "ffa-fix" },
+		"p74b": func(p *Params) { v074(p); p.FFASwap = "ffa-fixrf" },
 		// roof first, farm later: the v0.5 opening, then this build with roofs wanted at once
 		"ffa-rf":     func(p *Params) { p.BrawlRoofAfter = 0; p.RoofFarmAfter = 60 },
 		"ffa-rf45":   func(p *Params) { p.BrawlRoofAfter = 0; p.RoofFarmAfter = 45 },

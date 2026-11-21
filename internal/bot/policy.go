@@ -61,7 +61,10 @@ func (b *Bot) think(act *proto.Action) {
 			st = b.belief()
 		}
 	}
-	if b.ffa && !b.swapped && b.P.FFASwap != "" {
+	// (The swap asks for a little more than the stance does: two deaths that were not ours, or one
+	// while we have no kill at all. Against the practice squad a death we caused sometimes goes
+	// uncredited, and the swap must not happen there: the build's practice score depends on it.)
+	if b.ffa && !b.swapped && b.P.FFASwap != "" && (b.unexplained >= 2 || b.kills == 0 || b.P.ForceFFA) {
 		// A free-for-all for certain: change to the parameter set named in FFASwap for the rest of the
 		// match. Practice never gets here, so whatever the build scores in practice stays as it is.
 		b.swapped = true
