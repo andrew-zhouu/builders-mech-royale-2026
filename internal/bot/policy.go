@@ -209,7 +209,21 @@ func (b *Bot) think(act *proto.Action) {
 				// for a mech with a laser against one without.
 				// (the edge that counts: our laser against none, or an estimate so lopsided that the
 				// fight is nearly over)
-				edge := (b.laserEdge(tgt.tr) && tgt.adv >= b.P.AvoidAdv) || tgt.adv >= b.P.CoverEdgeAdv
+				// (with memory: an estimate hovering at the threshold must not have us turning between
+				// the firing line and the cover several times a second, doing neither)
+				edgeThr, edgeBig := b.P.AvoidAdv, b.P.CoverEdgeAdv
+				if b.P.EdgeHold > 0 {
+					switch {
+					case b.t-b.edgeOnT < b.P.EdgeHold:
+						edgeThr, edgeBig = edgeThr*0.75, edgeBig*0.75 // standing on an edge: stay unless it is clearly gone
+					case b.t-b.slipOnT < b.P.EdgeHold:
+						edgeThr, edgeBig = edgeThr*1.3, edgeBig*1.3 // going for cover: do not turn back for a marginal one
+					}
+				}
+				edge := (b.laserEdge(tgt.tr) && tgt.adv >= edgeThr) || tgt.adv >= edgeBig
+				if edge && provoked {
+					b.edgeOnT = b.t
+				}
 				coverFirst := b.P.CoverFirst && provoked && !edge && tgt.d >= b.P.CoverMinRange
 				switch {
 				case !provoked:
@@ -865,7 +879,11 @@ func (b *Bot) slipFromX(tgt *threat, ths []threat, anyEdge bool) bool {
 		if tgt.tr.Laser && b.P.AvoidCoverLaser > reach {
 			reach = b.P.AvoidCoverLaser // against a laser, cover is worth a longer run
 		}
-		b.slipCell = b.findCover(ths, reach)
+		c := b.findCover(ths, reach)
+		if c >= 0 || b.P.EdgeHold <= 0 || b.t-b.slipOnT > 1.5 {
+			// (a search that comes up empty for a moment does not cancel a run to cover already begun)
+			b.slipCell = c
+		}
 		b.slipT = b.t
 	}
 	if b.slipCell < 0 {

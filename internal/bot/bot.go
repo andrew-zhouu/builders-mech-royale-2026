@@ -81,6 +81,7 @@ type Params struct {
 	AvoidCover      float64 // ... if cover is within this path length
 	CoverFirst      bool    // brawl stance: hit by someone we have no clear edge over, go for cover first (any range beyond CoverMinRange, light fire included)
 	CoverMinRange   float64
+	EdgeHold        float64 // seconds a fight-or-cover decision is given the benefit of the doubt before it may flip (0 = none)
 	LootHiddenBias  float64 // brawl stance: loot in plain sight of a mech we know about is worth this much less (0..1)
 	CoverEdgeAdv    float64 // ... unless our estimated advantage is at least this (a laser against none needs only AvoidAdv)
 	HuntLaserEdge   bool    // brawl stance: start a fight only with a laser against a mech without one (or at CoverEdgeAdv)
@@ -177,6 +178,7 @@ func DefaultParams() Params {
 		AvoidCover:        55,
 		ZoneSlack:         10,
 		CoverFirst:        true,
+		EdgeHold:          2.5,
 		HuntLaserEdge:     true,
 		LootHiddenBias:    0.5,
 		CoverMinRange:     40,
@@ -427,6 +429,7 @@ type Bot struct {
 	holdRoofMove bool    // do not leave the roof we are on right now (same reason; the zone is not close yet)
 	jinkSign    float64  // which side the current zig of a zig-zag goes
 	jinkT       float64  // when it flips next
+	edgeOnT     float64  // last time we stood to fight on an edge (brawl stance)
 	slipCell    int      // cover we are slipping to (brawl stance)
 	slipT       float64  // when it was last looked for
 	slipOnT     float64  // last time we decided to slip
@@ -494,6 +497,7 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	b.hideOutT = -100
 	b.unquietT = -100
 	b.slipCell, b.slipT, b.slipOnT = -1, -100, -100
+	b.edgeOnT = -100
 	b.jinkSign, b.jinkT = 1, -100
 	b.roofCoverHoldT = -100
 	b.peek = peekPlan{t: -100, tgt: -1, roof: -1, duck: -1, fire: -1}
