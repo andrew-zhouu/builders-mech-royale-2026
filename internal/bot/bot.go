@@ -151,7 +151,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "h3r45"
+var BuildVariant = "h3r45f"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -180,7 +180,7 @@ func baseParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
-		Salt:          1,
+		Salt:          0,
 		QuietSlip:     true, // do not start it with a mech that has not touched us, unless we hold a laser and it does not
 		QuietSlipMin:  40,
 		LaserMechOnly: true,

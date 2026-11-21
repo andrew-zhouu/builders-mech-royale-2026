@@ -134,6 +134,8 @@ func Variants() map[string]func(p *Params) {
 		"h3r45":      func(p *Params) { p.OpenSet = "v05"; p.FFASwap = "ffa-rf45" },
 		"h3r90":      func(p *Params) { p.OpenSet = "v05"; p.FFASwap = "ffa-rf90" },
 		"h1r":        func(p *Params) { p.FFASwap = "ffa-rf" },
+		// the same with the path fix in the opening: v0.5 then walks to a weapon close by before the roof
+		"h3r45f":     func(p *Params) { p.OpenSet = "v05fix"; p.FFASwap = "ffa-rf45" },
 		"h3":         func(p *Params) { p.OpenSet = "v05" },
 		"h3s":        func(p *Params) { p.OpenSet = "v05"; p.FFASwap = "v05" },
 		"b-noquiet":  func(p *Params) { p.QuietSlip = false },
