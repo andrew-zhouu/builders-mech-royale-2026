@@ -1,0 +1,169 @@
+package bot
+
+import (
+	"math"
+	"sort"
+)
+
+// stance is how we behave given what kind of lobby this looks like.
+type stance struct {
+	name        string
+	engageRatio float64 // start fights above this advantage
+	disengage   float64 // evade below this
+	hunt        bool    // chase favourable targets that are not on us
+	stealth     bool    // hide, stay out of sight, loot only when quiet
+	lootRadius  float64
+	wantCubes   int
+}
+
+// belief updates what we think the lobby is and returns the matching stance.
+func (b *Bot) belief() stance {
+	// Deaths we did not cause mean the others fight each other. A mech we were just shooting that
+	// then dies to something else (a drone, the zone, a stray shell) is credited to us, and one odd
+	// death is not enough: the cooperating house squad can lose a member to the zone.
+	total := int(stat(b.C.Match, "mechs", 16))
+	dead := total - b.o.Alive
+	if dead > b.deadSeen {
+		n := dead - b.deadSeen
+		b.deadSeen = dead
+		if b.kills > b.killsSeen {
+			n -= b.kills - b.killsSeen
+			b.killsSeen = b.kills
+		} else if b.t-b.creditT < 6 {
+			n--
+		}
+		if n > 0 {
+			b.unexplained += n
+		}
+		if (b.unexplained >= 1 && b.t < 35) || (b.unexplained >= 2 && b.t < 110) || b.unexplained >= 3 {
+			b.ffa = true
+		}
+	}
+	alive := b.o.Alive
+	if b.P.ForceFFA {
+		b.ffa = true
+	}
+	switch {
+	case alive <= 2:
+		// second place is banked: nothing to lose by fighting for first
+		return stance{name: "duel", engageRatio: 0.0, disengage: 0.45, hunt: true, lootRadius: 150, wantCubes: 40}
+	case b.ffa && b.P.PracticeAware:
+		return stance{name: "ffa", engageRatio: b.P.FFAEngage, disengage: b.P.FFADisengage, hunt: false, stealth: true, lootRadius: b.P.FFALootRadius, wantCubes: b.P.FFAWantCubes}
+	case b.t < b.P.OpenSecs && b.P.PracticeAware:
+		// not known yet: careful, but not shy about loot close by
+		return stance{name: "open", engageRatio: 1.5, disengage: 0.9, hunt: false, stealth: true, lootRadius: 110, wantCubes: b.P.WantCubes}
+	}
+	return stance{name: "squad", engageRatio: b.P.EngageRatio, disengage: b.P.DisengageRat, hunt: b.P.Hunt, lootRadius: b.P.LootRadius, wantCubes: b.P.WantCubes}
+}
+
+type hideCand struct {
+	cell  int
+	score float64
+}
+
+// chooseHide picks a low-exposure place inside the circle we must end up in. Lower score is better.
+func (b *Bot) chooseHide(zi zoneInfo) int {
+	z := &b.o.Zone
+	exp := b.Nav.Exposure()
+	comp := b.Nav.Components()
+	myComp := int32(0)
+	if c := b.Nav.Nearest(b.pos[0], b.pos[1], 2.9, 9, 6); c >= 0 {
+		myComp = comp[c]
+	}
+	// the region we may hide in: the next circle, shrunk by a margin; early in a long hold we also
+	// accept anywhere in the current circle that the next shrink will not reach soon
+	margin := math.Min(14, z.NextRadius*0.25)
+	var cands []hideCand
+	for j := 0; j < exp.NY; j++ {
+		for i := 0; i < exp.NX; i++ {
+			e := exp.V[j*exp.NX+i]
+			if e > 1.5 {
+				continue
+			}
+			k := exp.Cell(i, j)
+			if myComp != 0 && comp[k] != myComp {
+				continue
+			}
+			x, y := b.Nav.Pos(k)
+			dn := hyp(x-z.NextCenter[0], y-z.NextCenter[1])
+			if dn > z.NextRadius-margin {
+				continue
+			}
+			if !b.Nav.Walkable(k, b.radius+0.4, b.height) {
+				continue
+			}
+			d := hyp(x-b.pos[0], y-b.pos[1])
+			if d > 320 {
+				continue
+			}
+			// walking is when we get seen: a far better spot has to be clearly better
+			s := float64(e)*100 + d*b.hideDistW()
+			// the middle of the circle is where everyone ends up walking through
+			if z.NextRadius > 60 && dn < z.NextRadius*0.35 {
+				s += 10
+			}
+			// prefer being close to a wall (something to duck behind)
+			s += float64(b.Nav.Clear[k]) * 0.8
+			if k == b.holdCell {
+				s -= 9
+			}
+			cands = append(cands, hideCand{k, s})
+		}
+	}
+	if len(cands) == 0 {
+		return -1
+	}
+	sort.Slice(cands, func(a, c int) bool { return cands[a].score < cands[c].score })
+	if len(cands) > 60 {
+		cands = cands[:60]
+	}
+	// refine the shortlist with what we know about enemies and hot spots
+	best, bs := -1, 1e18
+	for _, c := range cands {
+		x, y := b.Nav.Pos(c.cell)
+		gz := float64(b.Nav.Z[c.cell])
+		s := c.score
+		for _, tr := range b.tracks {
+			if tr.NPC || b.t-tr.LastSeen > 25 {
+				continue
+			}
+			d := hyp(tr.Pos[0]-x, tr.Pos[1]-y)
+			if d < 90 {
+				s += (90 - d) * 0.35
+			}
+			if d < 260 && b.t-tr.LastSeen < 8 {
+				sc := tr.scale(b.sizePerCube)
+				if b.W.Visible(tr.Pos[0], tr.Pos[1], tr.Pos[2]+8*sc, x, y, gz+b.height*0.6) {
+					s += 30
+				}
+			}
+		}
+		for i := range b.o.Drops {
+			if hyp(b.o.Drops[i].Pos[0]-x, b.o.Drops[i].Pos[1]-y) < 70 {
+				s += 15
+			}
+		}
+		if s < bs {
+			best, bs = c.cell, s
+		}
+	}
+	return best
+}
+
+func (b *Bot) hideDistW() float64 {
+	if b.st.stealth {
+		return 0.16
+	}
+	return 0.07
+}
+
+// seenBy lists the enemy mechs that currently have a line to us (and are close enough to matter).
+func (b *Bot) seenBy(ths []threat, maxD float64) []*threat {
+	var out []*threat
+	for i := range ths {
+		if ths[i].tr.LOS && ths[i].tr.Listed && ths[i].d < maxD {
+			out = append(out, &ths[i])
+		}
+	}
+	return out
+}
