@@ -36,6 +36,24 @@ func (b *Bot) think(act *proto.Action) {
 	b.pickUpgrade(act)
 	b.manageWeapons(act)
 	st := b.belief()
+	if b.openSetOn && (b.ffa || !b.openPhase()) {
+		// the lobby is known (a free-for-all) or assumed (practice): the opening set has done its part
+		b.openSetOn = false
+		b.P = b.pBase
+		st = b.belief()
+	}
+	if b.ffa && !b.swapped && b.P.FFASwap != "" {
+		// A free-for-all for certain: change to the parameter set named in FFASwap for the rest of the
+		// match. Practice never gets here, so whatever the build scores in practice stays as it is.
+		b.swapped = true
+		if f := Variants()[b.P.FFASwap]; f != nil {
+			q := b.P
+			f(&q)
+			q.FFASwap = ""
+			b.P = q
+			st = b.belief()
+		}
+	}
 	b.st = st
 	if b.o.Tick%6 == 0 {
 		b.markSeen()
@@ -207,10 +225,11 @@ func (b *Bot) think(act *proto.Action) {
 			case st.avoid:
 				// Free-for-all: an exchange at range without an edge is a coin flip that leaves even
 				// the winner weak, and being looked at is not being attacked.
-				provoked := !b.P.ProvokeRule || b.t-tgt.tr.HurtMeT < 4 || tgt.d < b.P.AvoidRange ||
+				hostile := b.t-tgt.tr.HurtMeT < 4 ||
 					(tgt.tr.Laser && tgt.tr.Charging && b.t-tgt.tr.AimAtMeT < 0.4) ||
 					// a laser pointed our way is a third of our health about to go: do not wait for it
 					(b.P.LaserPreempt && tgt.tr.Laser && tgt.tr.LOS && b.t-tgt.tr.AimAtMeT < 0.6)
+				provoked := !b.P.ProvokeRule || hostile || tgt.d < b.P.AvoidRange
 				far := tgt.d >= b.P.AvoidRange && tgt.adv < b.P.AvoidAdv
 				// heavy fire (a laser, or a gun that is actually landing) needs cover; light fire does not
 				heavy := tgt.tr.Laser || b.recentDmg/3.0 > b.P.PlinkMaxDPS || hpFrac < 0.5 || nEngaged >= 2
@@ -247,6 +266,9 @@ func (b *Bot) think(act *proto.Action) {
 					// on roofs against 32 elsewhere): out of sight behind the edge, shooting back on
 					// the way (falls back to fighting from the roof if it has no hidden spot)
 					roofDuck = true
+				case b.P.QuietSlip && b.P.ProvokeRule && !hostile && !edge && tgt.d > b.P.QuietSlipMin && b.t-b.lastWeaponDT > 2.5:
+					// near, nothing to get behind, and it has not touched us: we do not start it either
+					unprovoked = true
 				case far && heavy && b.slipFrom(tgt, ths):
 					slip = true
 				case far && !heavy && b.P.PlinkMaxDPS > 0:
@@ -528,6 +550,17 @@ func (b *Bot) think(act *proto.Action) {
 					rq.hold = true
 					b.mode = "ambush"
 				}
+			}
+		}
+		// Do not start it on the way. (Our first real match with this build: 83 m from a mech with a
+		// laser that had not touched us, we shot at it while walking to cover, with no laser of our
+		// own; it turned round and we were dead five seconds later. In the real matches the one who
+		// fires first on a laser holder without holding one finishes 2.2 points behind.)
+		if b.P.QuietSlip && tgt != nil && b.t-tgt.tr.HurtMeT > 4 && b.t-b.lastWeaponDT > 2.5 &&
+			!(tgt.tr.Laser && tgt.tr.Charging && b.t-tgt.tr.AimAtMeT < 0.6) && !b.laserEdge(tgt.tr) && tgt.d > b.P.QuietSlipMin {
+			holdFire = true
+			if b.mode == "slip" {
+				b.mode = "slip-quiet"
 			}
 		}
 

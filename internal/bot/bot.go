@@ -38,6 +38,10 @@ type Params struct {
 	FFAWantCubes  int
 	FFAReturnFire float64 // only shoot back at attackers closer than this
 	Salt          int     // changes the dice only (see New)
+	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
+	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
+	FFASwap       string  // variant to switch to once the lobby is known to be a free-for-all ("" = none)
+	OpenSet       string  // variant in force from the start until the lobby is known or assumed ("" = none)
 	ForceFFA      bool    // testing: assume a free-for-all from the start
 	SlotRule      bool    // WRONG, never enable: the track page says the practice slot varies each match
 	CloseDisengage float64 // disengage threshold against an attacker within ~60 m (stealth stances)
@@ -153,7 +157,9 @@ func DefaultParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
-		Salt:          8,
+		Salt:          0,
+		QuietSlip:     true, // do not start it with a mech that has not touched us, unless we hold a laser and it does not
+		QuietSlipMin:  40,
 		// SlotRule stays off: the track page says the practice slot varies each match
 		FFAEngage:     1.8,
 		FFADisengage:  0.95,
@@ -407,6 +413,9 @@ type Bot struct {
 	deepCell   int     // retreat: the next place deeper into cover we are walking to (-1 none)
 	deepT      float64 // ... when we chose it
 	deepTryT   float64 // ... when we last looked for one
+	swapped     bool    // FFASwap has been applied
+	openSetOn   bool    // the opening set (OpenSet) is in force
+	pBase       Params  // the parameters to return to after the opening set
 	standT      float64 // last time we stayed in a fight for want of cover close by
 	creditAbsorbT float64 // last death we put down to our own shooting without being given the kill
 	nearCoverT  float64 // coverClose: when we last looked
@@ -501,6 +510,18 @@ func Factory(h *proto.Hello, w *world.World, nav *world.Nav) *Bot {
 
 func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	b := &Bot{P: p, H: h, C: &h.Config, W: w, Nav: nav}
+	if p.OpenSet != "" {
+		// a different parameter set for the opening, while we do not know what kind of lobby this is
+		if f := Variants()[p.OpenSet]; f != nil {
+			b.pBase = p
+			q := p
+			f(&q)
+			q.OpenSet, q.FFASwap, q.Salt = p.OpenSet, p.FFASwap, p.Salt
+			b.P = q
+			p = q
+			b.openSetOn = true
+		}
+	}
 	// (Salt: builds that differ only in it play the same game with different dice. Practice is 48 fixed
 	// hidden matches, so each such build is a fresh draw of the same strength.)
 	b.rng = rand.New(rand.NewSource(h.Seed*7919 + int64(h.Slot) + 1 + int64(p.Salt)*104729))

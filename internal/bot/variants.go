@@ -120,6 +120,15 @@ func Variants() map[string]func(p *Params) {
 		"v074": func(p *Params) { v074(p) },
 		"b-standrun": func(p *Params) { p.RetreatRunMax = 50 },
 		// the opening rule (position before loot while a mech is in view): off, and other settings
+		// hybrids: this build until the lobby is known to be a free-for-all, then another set
+		"v05fix":     func(p *Params) { v05(p); p.PathFix = true; p.CreditFix = true },
+		"h-v05":      func(p *Params) { p.FFASwap = "v05" },
+		"h-v05fix":   func(p *Params) { p.FFASwap = "v05fix" },
+		// ... and with the v0.5 opening as well: h3 = v0.5 opening then this build, h3s = v0.5 opening,
+		// v0.5 in a free-for-all, this build only against the practice squad
+		"h3":         func(p *Params) { p.OpenSet = "v05" },
+		"h3s":        func(p *Params) { p.OpenSet = "v05"; p.FFASwap = "v05" },
+		"b-noquiet":  func(p *Params) { p.QuietSlip = false },
 		"s1":         func(p *Params) { p.Salt = 1 },
 		"s2":         func(p *Params) { p.Salt = 2 },
 		"s3":         func(p *Params) { p.Salt = 3 },
@@ -241,6 +250,7 @@ func v074(p *Params) {
 	p.CreditOpenS = 0
 	p.ShySecs = 0
 	p.SlotRule = false
+	p.QuietSlip = false
 }
 
 // oldLead is the gun lead of every build up to v0.6.1: instantaneous velocity, damped to 75%.
