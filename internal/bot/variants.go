@@ -145,6 +145,15 @@ func Variants() map[string]func(p *Params) {
 			p.FFASwap, p.FFALate, p.FFALateT = "v05fix", "ffa-fixrf", 50
 		},
 		"p74d": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fix", "ffa-fixrf", 50 },
+		// p74e = out of sight after detection: cover when a known mech can see us, loot only what it
+		// cannot see, lie low otherwise, no fights of our own, all until 50 s; then the fixed game
+		"ffa-shy": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.ShySecs, p.ShyRange, p.ShyLaser, p.ShyMem, p.ShyBoost = 50, 220, 60, 6, 40
+			p.HuntAfter = 50
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+		},
+		"p74e": func(p *Params) { v074(p); p.FFASwap = "ffa-shy" },
 		"p74a": func(p *Params) { v074(p); p.FFASwap = "ffa-fix" },
 		"p74b": func(p *Params) { v074(p); p.FFASwap = "ffa-fixrf" },
 		// roof first, farm later: the v0.5 opening, then this build with roofs wanted at once
