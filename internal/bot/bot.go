@@ -82,6 +82,9 @@ type Params struct {
 	CoverFirst      bool    // brawl stance: hit by someone we have no clear edge over, go for cover first (any range beyond CoverMinRange, light fire included)
 	CoverMinRange   float64
 	EdgeHold        float64 // seconds a fight-or-cover decision is given the benefit of the doubt before it may flip (0 = none)
+	RunOnRange      float64 // hurt and behind cover with the attacker last seen inside this range: keep going, deeper into cover (0 = stop at the first corner)
+	RunOnGain       float64 // ... each leg must put at least this much more distance between us
+	CoverMargin     float64 // cover must stay cover when the threat steps this far to either side (0 = the nearest hidden spot will do)
 	LootHiddenBias  float64 // brawl stance: loot in plain sight of a mech we know about is worth this much less (0..1)
 	CoverEdgeAdv    float64 // ... unless our estimated advantage is at least this (a laser against none needs only AvoidAdv)
 	HuntLaserEdge   bool    // brawl stance: start a fight only with a laser against a mech without one (or at CoverEdgeAdv)
@@ -180,6 +183,9 @@ func DefaultParams() Params {
 		CoverFirst:        true,
 		NoMortar:          true, // a laser hit on a mortar carrier does 60% more (seen: 1,024 health gone in 0.7 s)
 		EdgeHold:          2.5,
+		RunOnRange:        80,
+		RunOnGain:         18,
+		CoverMargin:       8,
 		HuntLaserEdge:     true,
 		LootHiddenBias:    0.5,
 		CoverMinRange:     40,
@@ -371,6 +377,9 @@ type Bot struct {
 	retreating bool
 	coverCell  int
 	coverT     float64
+	deepCell   int     // retreat: the next place deeper into cover we are walking to (-1 none)
+	deepT      float64 // ... when we chose it
+	deepTryT   float64 // ... when we last looked for one
 	lootID     int
 	lootT      float64
 	holdCell   int
@@ -477,6 +486,7 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	b.targetID = -1
 	b.lootID = -1
 	b.coverCell = -1
+	b.deepCell, b.deepT, b.deepTryT = -1, -100, -100
 	b.holdCell = -1
 	b.evadeCell = -1
 	b.lastDamageT = -100

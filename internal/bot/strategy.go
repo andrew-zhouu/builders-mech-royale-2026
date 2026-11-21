@@ -251,6 +251,40 @@ func (b *Bot) findCover(ths []threat, maxCost float64) int {
 	return found
 }
 
+// cellHidden reports whether a mech standing in the cell is out of sight of every recent threat's
+// last known position.
+func (b *Bot) cellHidden(k int, ths []threat) bool {
+	x, y := b.Nav.Pos(k)
+	gz := float64(b.Nav.Z[k])
+	for i := range ths {
+		tr := ths[i].tr
+		if (b.t-tr.LastSeen > 6 && !ths[i].phantom) || ths[i].d > 260 {
+			continue
+		}
+		sc := tr.scale(b.sizePerCube)
+		ex, ey, ez := tr.Pos[0], tr.Pos[1], tr.Pos[2]+8*sc
+		if b.W.Visible(ex, ey, ez, x, y, gz+b.height*0.5) || b.W.Visible(ex, ey, ez, x, y, gz+b.height*0.95) {
+			return false
+		}
+	}
+	return true
+}
+
+// nearestEye is the distance to the nearest recent threat's last known position (1e9: none).
+func (b *Bot) nearestEye(ths []threat) float64 {
+	d0 := 1e9
+	for i := range ths {
+		tr := ths[i].tr
+		if (b.t-tr.LastSeen > 6 && !ths[i].phantom) || ths[i].d > 260 {
+			continue
+		}
+		if d := hyp(tr.Pos[0]-b.pos[0], tr.Pos[1]-b.pos[1]); d < d0 {
+			d0 = d
+		}
+	}
+	return d0
+}
+
 type loot struct {
 	kind  string // "pickup", "cube", "crate", "npc", "drop"
 	id    int
