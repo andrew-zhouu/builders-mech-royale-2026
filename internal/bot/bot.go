@@ -153,7 +153,7 @@ func DefaultParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
-		Salt:          7,
+		Salt:          8,
 		// SlotRule stays off: the track page says the practice slot varies each match
 		FFAEngage:     1.8,
 		FFADisengage:  0.95,
