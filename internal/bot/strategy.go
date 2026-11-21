@@ -98,6 +98,11 @@ func (b *Bot) zoneInfo() zoneInfo {
 	need := 0.0
 	if zi.outNext > 0 {
 		need = (zi.outNext+8)/b.walk*1.35 + 4
+		if !zi.walkable && b.P.OverlandEarly > 0 {
+			// the way in is over walls (we are in the stadium bowl, or on a roof with no walk down):
+			// that is slow and can fail, so start long before the edge arrives
+			need = need*b.P.OverlandEarly + 25
+		}
 	}
 	zi.critical = zi.outCur > -2 || zi.tPass < 2.5
 	zi.urgent = zi.critical || zi.tPass < 9 || (zi.outNext > 0 && z.ShrinkEnd-b.t < need) || (zi.outNext > 0 && zi.tPass-need < 3)
@@ -334,6 +339,20 @@ func (b *Bot) enemyNear(pos [3]float64, r float64) bool {
 
 func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 	var best *loot
+	// where the mechs we know about are looking from (for the out-of-sight preference)
+	var watchEyes [][3]float64
+	if b.P.LootHiddenBias > 0 && st.avoid {
+		for _, tr := range b.tracks {
+			if tr.NPC || b.t-tr.LastSeen > 4 {
+				continue
+			}
+			sc := tr.scale(b.sizePerCube)
+			watchEyes = append(watchEyes, [3]float64{tr.Pos[0], tr.Pos[1], tr.Pos[2] + 8*sc})
+			if len(watchEyes) >= 6 {
+				break
+			}
+		}
+	}
 	consider := func(l loot, value, handling float64) {
 		d := dist2(b.pos, l.pos)
 		if d > st.lootRadius {
@@ -359,6 +378,16 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 		}
 		if b.enemyNear(l.pos, 45) && l.kind != "cube" {
 			value *= 0.35
+		}
+		if b.P.LootHiddenBias > 0 && st.avoid && len(watchEyes) > 0 {
+			// errands out of other mechs' sight first: in the real matches everyone caught up in a
+			// fight in the first half minute, whoever started it, finished a point below the rest
+			for _, e := range watchEyes {
+				if hyp(e[0]-l.pos[0], e[1]-l.pos[1]) < 230 && b.W.Visible(e[0], e[1], e[2], l.pos[0], l.pos[1], l.pos[2]+4.5) {
+					value *= 1 - b.P.LootHiddenBias
+					break
+				}
+			}
 		}
 		l.score = value / (tt + 1.5)
 		if l.id == b.lootID {
