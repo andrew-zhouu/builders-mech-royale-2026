@@ -10,6 +10,21 @@ package bot
 // shadow to a place that stays hidden when the attacker shifts sideways, and, with a hurt mech and the
 // attacker close, a place clearly farther from it as well (health comes back just as fast on the move).
 
+// stuckOn reports whether we have been working on the same crate or drone for more than limit seconds
+// without taking 20 health off it. It keeps the bookkeeping itself: call it every decision spent on
+// the thing, with its current health.
+func (b *Bot) stuckOn(id int, hp, limit float64) bool {
+	if id != b.crateTryID || hp < b.crateTryHP-20 || b.t-b.crateSeenT > 1.5 {
+		b.crateTryID, b.crateTryT, b.crateTryHP = id, b.t, hp
+	}
+	b.crateSeenT = b.t
+	if b.t-b.crateTryT > limit {
+		b.crateTryID = -1
+		return true
+	}
+	return false
+}
+
 // shyPhase reports whether the opening rule applies: the first ShySecs of a match in a free-for-all
 // stance (see think for what it does and why).
 func (b *Bot) shyPhase(st stance) bool {

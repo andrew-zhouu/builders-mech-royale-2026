@@ -39,6 +39,8 @@ type Params struct {
 	FFAReturnFire float64 // only shoot back at attackers closer than this
 	Salt          int     // changes the dice only (see New)
 	LaserMechOnly bool    // never start a laser charge at a crate or a drone
+	CrateGiveUp   float64 // seconds at a crate (in sight or beside it) without hurting it before we leave it alone (0 = never)
+	NpcGiveUp     float64 // the same for a drone we are trying to shoot
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
 	FFASwap       string  // variant to switch to once the lobby is known to be a free-for-all ("" = none)
@@ -162,10 +164,12 @@ func DefaultParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
-		Salt:          3,
+		Salt:          0,
 		QuietSlip:     true, // do not start it with a mech that has not touched us, unless we hold a laser and it does not
 		QuietSlipMin:  40,
 		LaserMechOnly: true,
+		CrateGiveUp:   5,
+		NpcGiveUp:     8,
 		// SlotRule stays off: the track page says the practice slot varies each match
 		FFAEngage:     1.8,
 		FFADisengage:  0.95,
@@ -421,6 +425,10 @@ type Bot struct {
 	deepTryT   float64 // ... when we last looked for one
 	swapped     bool    // FFASwap has been applied
 	healing     bool    // HealFirst: hurt and letting the health come back before farming again
+	crateTryID  int     // the crate (or drone) we are working on, when we started and its health then
+	crateTryT   float64
+	crateTryHP  float64
+	crateSeenT  float64 // last decision spent on it
 	squadOn     bool    // the practice set (SquadSet) is in force
 	pPre        Params  // the parameters to return to if the practice set turns out to be wrong
 	openSetOn   bool    // the opening set (OpenSet) is in force

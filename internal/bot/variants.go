@@ -129,7 +129,8 @@ func Variants() map[string]func(p *Params) {
 		"h3":         func(p *Params) { p.OpenSet = "v05" },
 		"h3s":        func(p *Params) { p.OpenSet = "v05"; p.FFASwap = "v05" },
 		"b-noquiet":  func(p *Params) { p.QuietSlip = false },
-		"v075":       func(p *Params) { p.LaserMechOnly = false },
+		"v075":       func(p *Params) { p.LaserMechOnly = false; p.CrateGiveUp = 0; p.NpcGiveUp = 0 },
+		"v076":       func(p *Params) { p.CrateGiveUp = 0; p.NpcGiveUp = 0 },
 		// practice-only sets (applied through SquadSet) and the builds that use them
 		"sq-off":      func(p *Params) { p.UpOffense = 0.2 },
 		"sq-stand":    func(p *Params) { p.DuelDisengage = 0; p.LeaveTTD = 0; p.RetreatHP = 0 },
@@ -268,6 +269,8 @@ func v074(p *Params) {
 	p.SlotRule = false
 	p.QuietSlip = false
 	p.LaserMechOnly = false
+	p.CrateGiveUp = 0
+	p.NpcGiveUp = 0
 }
 
 // oldLead is the gun lead of every build up to v0.6.1: instantaneous velocity, damped to 75%.

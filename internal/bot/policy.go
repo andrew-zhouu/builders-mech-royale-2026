@@ -712,6 +712,9 @@ func (b *Bot) think(act *proto.Action) {
 		b.mode = "pest"
 		at := b.targetOf(tr)
 		d := dist2(b.pos, tr.Pos)
+		if b.P.NpcGiveUp > 0 && b.stuckOn(tr.ID, tr.HP, b.P.NpcGiveUp) {
+			b.banUntil[tr.ID] = b.t + 60 // cannot get at it: stop trying (see pest)
+		}
 		if tr.LOS && d < 120 {
 			shootItem = &at
 			shootHP = tr.HP
@@ -783,6 +786,18 @@ func (b *Bot) think(act *proto.Action) {
 				} else {
 					rq.hold = true
 				}
+				// A crate we stand at and cannot break is given up. (A real match: 75 s motionless
+				// beside one that the eye could see and no shot could reach.)
+				if b.P.CrateGiveUp > 0 {
+					hp := 1e9
+					if it != nil {
+						hp = it.HP
+					}
+					if d <= 12 && b.stuckOn(l.id, hp, b.P.CrateGiveUp) {
+						b.banUntil[l.id] = b.t + 120
+						b.lootID = -1
+					}
+				}
 			case "npc":
 				tr := b.tracks[l.id]
 				if tr != nil {
@@ -796,6 +811,10 @@ func (b *Bot) think(act *proto.Action) {
 						setGoal(l.pos[0], l.pos[1], 1.5, false)
 					} else {
 						b.strafe(&rq, tr.Pos, 50, 70, 1.0)
+					}
+					if b.P.NpcGiveUp > 0 && d < 80 && b.stuckOn(tr.ID, tr.HP, b.P.NpcGiveUp) {
+						b.banUntil[l.id] = b.t + 90
+						b.lootID = -1
 					}
 				}
 			case "drop":
@@ -1202,6 +1221,9 @@ func (b *Bot) pest() *Track {
 	bd := 1e18
 	for _, tr := range b.tracks {
 		if !tr.NPC || b.t-tr.HurtMeT > 4 || b.t-tr.LastSeen > 3 {
+			continue
+		}
+		if until, banned := b.banUntil[tr.ID]; banned && b.t < until {
 			continue
 		}
 		if d := dist2(b.pos, tr.Pos); d < bd {
