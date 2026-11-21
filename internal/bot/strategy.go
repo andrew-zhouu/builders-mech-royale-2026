@@ -127,6 +127,11 @@ func (b *Bot) assess() []threat {
 		d := dist3(b.pos, tr.Pos)
 		th := threat{tr: tr, d: d, phantom: phantom}
 		th.adv, th.rmin, th.rmax = b.fightPlan(tr, d)
+		if b.P.ExchangeW > 0 && !tr.NPC && (tr.HurtMe > 1 || tr.IHurt > 1) {
+			// how the exchange with this one is actually going says more than any table
+			ex := (tr.IHurt + 150) / (tr.HurtMe + 150)
+			th.adv *= math.Pow(clamp(ex, 0.4, 1.8), b.P.ExchangeW)
+		}
 		th.dps = b.theirDPS(tr, d)
 		th.engaged = b.t-tr.HurtMeT < 4 || (tr.LOS && b.t-tr.AimAtMeT < 0.6 && d < 200) || (tr.LOS && d < 40)
 		if !th.engaged && tr.LOS && d < 90 {
@@ -245,12 +250,13 @@ type loot struct {
 	shoot bool
 }
 
-func weaponValue(kind string) float64 {
+// weaponValue ranks the weapons for pickup and swap decisions.
+func (b *Bot) weaponValue(kind string) float64 {
 	switch kind {
 	case "laser":
-		return 3.0
+		return b.P.LaserValue
 	case "lightning":
-		return 2.6
+		return b.P.LightningValue
 	case "mortar":
 		return 1.2
 	case "gun":
@@ -275,11 +281,11 @@ func (b *Bot) wantPickup(kind string) (bool, int) {
 		if b.slots[i].kind == "gun" {
 			continue
 		}
-		if v := weaponValue(b.slots[i].kind); v < wv {
+		if v := b.weaponValue(b.slots[i].kind); v < wv {
 			worst, wv = i, v
 		}
 	}
-	if worst >= 0 && weaponValue(kind) > wv+0.3 && b.slots[worst].charge <= 0 {
+	if worst >= 0 && b.weaponValue(kind) > wv+0.3 && b.slots[worst].charge <= 0 {
 		return true, worst
 	}
 	return false, -1
@@ -360,9 +366,9 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 			continue
 		}
 		if ok, rep := b.wantPickup(it.Kind); ok {
-			v := weaponValue(it.Kind) * 4
+			v := b.weaponValue(it.Kind) * 4
 			if rep >= 0 {
-				v = (weaponValue(it.Kind) - weaponValue(b.slots[rep].kind)) * 4
+				v = (b.weaponValue(it.Kind) - b.weaponValue(b.slots[rep].kind)) * 4
 			}
 			consider(loot{kind: "pickup", id: it.ID, pos: it.Pos}, v, 0.5)
 		}
@@ -467,7 +473,7 @@ func (b *Bot) manageWeapons(act *proto.Action) {
 			continue
 		}
 		if ok, rep := b.wantPickup(it.Kind); ok {
-			if v := weaponValue(it.Kind); v > bestV {
+			if v := b.weaponValue(it.Kind); v > bestV {
 				bestID, bestV, bestRep = it.ID, v, rep
 			}
 		}

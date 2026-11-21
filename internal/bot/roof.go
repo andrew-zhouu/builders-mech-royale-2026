@@ -26,6 +26,10 @@ type roofPlan struct {
 	chosen float64 // last time we evaluated roofs
 	tries  int
 	stepT  float64 // last time the roof plan was the thing we were doing
+	// set by the hideout chooser: the roof to use and the cell on it to stand at (-1: choose by the
+	// older geometric rule)
+	want int
+	spot int
 }
 
 // onRoof returns the id of the roof region we are standing on, or -1.
@@ -55,12 +59,20 @@ func (b *Bot) maxClimb() float64 {
 func (b *Bot) roofSpotOK(r *world.Roof) bool {
 	z := &b.o.Zone
 	x, y := b.Nav.Pos(r.Inner)
+	if b.roof.want == r.ID && b.roof.spot >= 0 {
+		x, y = b.Nav.Pos(b.roof.spot)
+	}
 	return hyp(x-z.NextCenter[0], y-z.NextCenter[1]) < z.NextRadius-8
 }
 
 // chooseRoof picks the best roof to hide on, with the access point to climb at.
 func (b *Bot) chooseRoof() (int, world.RoofAccess, bool) {
 	roofs, _ := b.Nav.Roofs()
+	if w := b.roof.want; w >= 0 && w < len(roofs) {
+		// the hideout chooser already picked the roof: find the way up
+		acc, _, ok := b.roofAccessFor(&roofs[w], math.Min(b.maxClimb(), b.P.RoofMaxClimb))
+		return w, acc, ok
+	}
 	comp := b.Nav.Components()
 	myComp := int32(0)
 	if c := b.Nav.Nearest(b.pos[0], b.pos[1], 2.9, 9, 6); c >= 0 {
@@ -126,6 +138,9 @@ func (b *Bot) roofSpot(id int) (float64, float64) {
 	roofs, roofOf := b.Nav.Roofs()
 	dist := b.Nav.RoofDist()
 	r := &roofs[id]
+	if s := b.roof.spot; b.roof.want == id && s >= 0 && int(roofOf[s]) == id {
+		return b.Nav.Pos(s) // the cell the hideout chooser picked on this roof
+	}
 	k := b.Nav.Index(b.pos[0], b.pos[1])
 	if int(roofOf[k]) != id {
 		return b.Nav.Pos(r.Inner)
@@ -402,6 +417,50 @@ func (b *Bot) roofPlanStep(wanted bool, act *proto.Action) (gx, gy float64, sett
 	return b.roofHold(act)
 }
 
+// hideoutFor is the policy's entry to the hideout chooser: stealth stances only, and it leaves the
+// roof plan pointed at the chosen roof (or free to choose by the older rule when the map is not used).
+func (b *Bot) hideoutFor(st stance, zi zoneInfo, allowRoof bool) (hideout, bool) {
+	if b.hm == nil || !st.stealth {
+		b.roof.want, b.roof.spot = -1, -1
+		return hideout{}, false
+	}
+	ho, ok := b.hideoutStep(zi, allowRoof)
+	if !ok {
+		b.roof.want, b.roof.spot = -1, -1
+		return ho, false
+	}
+	if ho.class == hmRoof {
+		b.roof.want, b.roof.spot = ho.roof, ho.cell
+	}
+	return ho, true
+}
+
+// hideoutStep returns the hideout to use right now (re-evaluated every couple of seconds, at once
+// when the current one falls outside the circle we must end up in).
+func (b *Bot) hideoutStep(zi zoneInfo, allowRoof bool) (hideout, bool) {
+	if b.hm == nil {
+		return hideout{}, false
+	}
+	stale := b.t-b.hideOutT > 2.0 || !b.hideOutOK
+	if b.hideOutOK && !stale {
+		z := &b.o.Zone
+		x, y := b.Nav.Pos(b.hideOut.cell)
+		if hyp(x-z.NextCenter[0], y-z.NextCenter[1]) > z.NextRadius-4 || (b.hideOut.class == hmRoof && !allowRoof) {
+			stale = true
+		}
+	}
+	if stale {
+		b.hideOut, b.hideOutOK = b.chooseHideout(zi, allowRoof)
+		b.hideOutT = b.t
+		if b.hideOutOK {
+			b.hideCell = b.hideOut.cell
+		} else {
+			b.hideCell = -1
+		}
+	}
+	return b.hideOut, b.hideOutOK
+}
+
 // roofHold is the "nothing else to do" behaviour when roofs are in play. It returns the goal to walk
 // to and whether we are settled (stand still). ok=false means no roof plan: fall back to ground hiding.
 func (b *Bot) roofHold(act *proto.Action) (gx, gy float64, settled, ok bool) {
@@ -412,12 +471,17 @@ func (b *Bot) roofHold(act *proto.Action) (gx, gy float64, settled, ok bool) {
 	b.roof.stepT = b.t
 	if id := b.onRoof(); id >= 0 && b.o.Self.Grounded {
 		r := &roofs[id]
-		if b.roofSpotOK(r) && r.Height >= b.P.RoofMinHeight-3 {
+		stay := b.roofSpotOK(r) && r.Height >= b.P.RoofMinHeight-3
+		if b.roof.want >= 0 {
+			// the hideout chooser decides which roof: stay only if this is the one it wants
+			stay = id == b.roof.want && b.roofSpotOK(r)
+		}
+		if stay {
 			b.roof.state, b.roof.id = roofOn, id
 			x, y := b.roofSpot(id)
 			return x, y, hyp(x-b.pos[0], y-b.pos[1]) < 2.0, true
 		}
-		// this roof is about to be outside the zone: plan the next one (or leave)
+		// this roof is about to be outside the zone (or is not the one we want): plan the next one
 		b.roof.state = roofNone
 	}
 	if b.roof.state == roofOn {

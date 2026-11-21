@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"fmt"
 	"math"
 
 	"mechroyale/internal/proto"
@@ -163,21 +164,68 @@ func (b *Bot) think(act *proto.Action) {
 		b.retreating = false
 	}
 
+	// "Patient" opening against the squad (experimental, off by default): killing hunters is what
+	// escalates the hunt, so first build up on crates, drones and drops and only swat a hunter that
+	// gets close; start killing once we are strong or the clock says so.
+	patient := st.name == "squad" && b.P.PatientSecs > 0 && b.t < b.P.PatientSecs && b.o.Self.Cubes < b.P.PatientCubes
 	wantFight := false
+	slip := false       // attacked from range without an edge: go behind cover, shooting back
+	plink := false      // lightly attacked from range: keep farming and shoot back in between
+	unprovoked := false // watched from range by someone who has not touched us: do not start it
+	huntR := b.P.HuntRange
+	if b.has("laser") >= 0 && b.P.HuntRangeLaser > huntR {
+		huntR = b.P.HuntRangeLaser
+	}
 	if tgt != nil && !b.retreating {
 		switch {
+		case patient && nEngaged <= 1 && tgt.d > b.P.PatientRange && hpFrac > 0.55:
+			// leave it alone for now (handled as "not fighting" below: we keep farming, guns quiet)
 		case tgt.engaged:
 			// someone is on us and we are not clearly losing (or we would be retreating): fight back.
 			// Slipping away only works against a far-off shooter that we have somewhere to hide from.
-			if !st.stealth || tgt.d < 140 || tgt.adv >= st.engageRatio {
+			switch {
+			case st.stealth:
+				if tgt.d < b.P.StealthFightRange || tgt.adv >= st.engageRatio {
+					wantFight = true
+				}
+			case st.avoid:
+				// Free-for-all: an exchange at range without an edge is a coin flip that leaves even
+				// the winner weak, and being looked at is not being attacked.
+				provoked := !b.P.ProvokeRule || b.t-tgt.tr.HurtMeT < 4 || tgt.d < b.P.AvoidRange ||
+					(tgt.tr.Laser && tgt.tr.Charging && b.t-tgt.tr.AimAtMeT < 0.4)
+				far := tgt.d >= b.P.AvoidRange && tgt.adv < b.P.AvoidAdv
+				// heavy fire (a laser, or a gun that is actually landing) needs cover; light fire does not
+				heavy := tgt.tr.Laser || b.recentDmg/3.0 > b.P.PlinkMaxDPS || hpFrac < 0.5 || nEngaged >= 2
+				switch {
+				case !provoked:
+					unprovoked = true // carry on; the torso keeps an eye on it, guns quiet
+				case far && heavy && b.slipFrom(tgt, ths):
+					slip = true
+				case far && !heavy && b.P.PlinkMaxDPS > 0:
+					plink = true // keep farming, shoot back when there is nothing better to shoot
+				case far && b.slipFrom(tgt, ths):
+					slip = true
+				default:
+					wantFight = true
+				}
+			default:
 				wantFight = true
 			}
-		case st.hunt && tgt.adv >= st.engageRatio && tgt.d < 130 && tgt.tr.LOS && hpFrac > 0.6:
+		case st.hunt && tgt.adv >= st.engageRatio && tgt.d < huntR && tgt.tr.LOS && hpFrac > 0.6:
 			wantFight = true
 		case st.name == "duel" && hpFrac > 0.5:
 			wantFight = true
 		case st.stealth && tgt.tr.LOS && tgt.d < 85 && tgt.tr.HP < 0.25*math.Max(tgt.tr.MaxHP, 1) && tgt.adv > 1.5:
 			// a nearly dead mech in reach: finish it for the cubes
+			wantFight = true
+		}
+	}
+	if plink && b.chooseLoot(true, st) == nil {
+		// nothing to farm: standing about under fire is pointless, so hide from it or have it out
+		plink = false
+		if b.slipFrom(tgt, ths) {
+			slip = true
+		} else {
 			wantFight = true
 		}
 	}
@@ -189,6 +237,13 @@ func (b *Bot) think(act *proto.Action) {
 				break
 			}
 		}
+	}
+	// "quiet" must last: a sight line that opens and closes as we take a step would otherwise flip us
+	// between going for loot and going back to hide, several times a second, in the open
+	if !quiet {
+		b.unquietT = b.t
+	} else if b.t-b.unquietT < b.P.QuietHoldS {
+		quiet = false
 	}
 
 	// --- movement
@@ -298,6 +353,16 @@ func (b *Bot) think(act *proto.Action) {
 		rq.fenceRoof = true
 		holdFire = tgt == nil || !tgt.engaged || tgt.d > b.P.FFAReturnFire
 
+	case slip:
+		// not our fight: get something solid between us, shooting back on the way
+		b.mode = "slip"
+		cx, cy := b.Nav.Pos(b.slipCell)
+		if d := setGoal(cx, cy, 2.5, b.energy > 25 && underFire); d < 0.9 || (d < 3.0 && b.hiddenHere(ths)) {
+			rq.wantW = 0
+			rq.hold = true
+			b.mode = "ambush"
+		}
+
 	case b.retreating:
 		b.mode = "retreat"
 		if b.t-b.coverT > 0.5 {
@@ -337,6 +402,14 @@ func (b *Bot) think(act *proto.Action) {
 			b.mode = "fight+cube"
 			dx, dy, _, _ := b.navDir(c.Pos[0], c.Pos[1])
 			rq.wantX, rq.wantY, rq.wantW = dx, dy, 2.2
+		} else if near := b.kiteFrom(ths, nEngaged); near != nil {
+			// several on us: open the range. Their gunnery falls off much faster with distance than
+			// ours does, and the torso keeps shooting while the legs back away.
+			b.mode = "kite"
+			b.strafe(&rq, near.tr.Pos, b.P.KiteMin, b.P.KiteMax, 2.0)
+			if near.d < 70 && b.energy > 45 {
+				rq.boost = true
+			}
 		} else {
 			b.fightMove(&rq, tgt)
 		}
@@ -388,9 +461,12 @@ func (b *Bot) think(act *proto.Action) {
 		holdFire = tgt == nil || !tgt.engaged || tgt.d > b.P.FFAReturnFire
 
 	default:
+		if patient {
+			holdFire = true // farming while a far-off hunter plinks at us: do not kill it yet
+		}
 		var l *loot
 		if (!st.stealth || quiet) && !roofFirst {
-			l = b.chooseLoot(danger, st)
+			l = b.chooseLoot(danger && !patient, st)
 		}
 		if l != nil && onRoof && roofWanted && l.kind != "drop" && !(l.kind == "pickup" && b.has("laser") < 0 && dist2(b.pos, l.pos) < 90) {
 			// hidden on a roof: only a weapon we badly want is worth coming down for
@@ -461,14 +537,25 @@ func (b *Bot) think(act *proto.Action) {
 					b.banUntil[-(b.roamCell + 1)] = b.t + 120
 					b.roamCell = -1
 				}
-			} else if gx, gy, settled, ok := b.roofPlanStep(roofWanted, act); ok {
+			} else if ho, ok := b.hideoutFor(st, zi, roofWanted); ok && ho.class != hmRoof {
+				// a ground hideout picked from the visibility map
+				b.mode = "hide"
+				b.roof.state, b.roof.want, b.roof.spot = roofNone, -1, -1
+				gx, gy := b.Nav.Pos(ho.cell)
+				if d := setGoal(gx, gy, 1.5, false); d < 2.5 {
+					rq.wantW = 0
+					rq.hold = true
+				}
+			} else if gx, gy, settled, ok2 := b.roofPlanStep(roofWanted, act); ok2 {
+				// a roof: either the one the visibility map picked (ok above) or by the older rule
 				b.mode = "roof"
 				if settled {
 					rq.hold = true
 				} else {
 					setGoal(gx, gy, 1.6, false)
 				}
-				rq.fenceRoof = onRoof
+				// stay on the roof only once we are on the one we want
+				rq.fenceRoof = onRoof && b.roof.state == roofOn
 			} else {
 				if b.holdCell < 0 || b.t-b.hideT > 2.0 {
 					b.holdCell = b.chooseHide(zi)
@@ -515,7 +602,10 @@ func (b *Bot) think(act *proto.Action) {
 		if li := b.has("laser"); li >= 0 && b.slots[li].charge > 0 {
 			act.Fire[li] = true
 		}
-	case tgt != nil && !holdFire && (wantFight || tgt.engaged || b.retreating):
+	case plink && shootItem != nil:
+		// farming under light fire from range: the crate (a cube, maybe a weapon) comes first
+		b.engage(act, *shootItem, true, true, shootHP, true)
+	case tgt != nil && !holdFire && !unprovoked && (wantFight || tgt.engaged || b.retreating):
 		at := b.targetOf(tgt.tr)
 		b.engage(act, at, tgt.tr.LOS, b.t-tgt.tr.LOST < 0.8, tgt.tr.HP, true)
 	case shootItem != nil:
@@ -544,7 +634,20 @@ func (b *Bot) think(act *proto.Action) {
 			}
 		}
 	}
-	act.Label = st.name + ":" + b.mode
+	b.modeLabel = st.name + ":" + b.mode
+	// The debug label doubles as telemetry (it is recorded per decision in a file only our team can
+	// get): stance:mode, health, mechs alive, attackers on us, our kills, cubes, weapons, target range.
+	wl := ""
+	for i := 0; i < 2; i++ {
+		if b.slots[i].ok {
+			wl += b.slots[i].kind[:2]
+		}
+	}
+	td := -1.0
+	if tgt != nil {
+		td = tgt.d
+	}
+	act.Label = fmt.Sprintf("%s h%.0f a%d e%d k%d c%d %s d%.0f", b.modeLabel, b.hp, b.o.Alive, nEngaged, b.kills, b.o.Self.Cubes, wl, td)
 }
 
 // weaponRun returns a weapon on the ground that is worth going for right now even with enemies about:
@@ -563,10 +666,10 @@ func (b *Bot) weaponRun(maxD float64) *Item {
 		if !ok {
 			continue
 		}
-		v := weaponValue(it.Kind)
+		v := b.weaponValue(it.Kind)
 		if rep >= 0 {
-			v -= weaponValue(b.slots[rep].kind)
-			if v < 1.0 {
+			v -= b.weaponValue(b.slots[rep].kind)
+			if v < b.P.ArmSwapMin {
 				continue // only a clear upgrade is worth a detour under watch
 			}
 		}
@@ -596,6 +699,57 @@ func (b *Bot) weaponRun(maxD float64) *Item {
 		}
 	}
 	return best
+}
+
+// slipFrom decides whether to decline an exchange at range: true when the attacker is beyond AvoidRange,
+// we have no clear edge over it, and there is cover close by (left in b.slipCell).
+func (b *Bot) slipFrom(tgt *threat, ths []threat) bool {
+	minR, maxAdv := b.P.AvoidRange, b.P.AvoidAdv
+	if b.t-b.slipOnT < 1.0 {
+		// already slipping: do not flip back and forth on the threshold
+		minR, maxAdv = minR*0.85, maxAdv*1.15
+	}
+	if b.P.AvoidAdv <= 0 || tgt.d < minR || tgt.adv >= maxAdv {
+		return false
+	}
+	// a target one burst from dead is worth the exposure
+	if tgt.tr.LOS && tgt.tr.HP > 0 && tgt.tr.HP < b.myDPS(tgt.d)*1.5+60 {
+		return false
+	}
+	if b.t-b.slipT > 0.5 {
+		b.slipCell = b.findCover(ths, b.P.AvoidCover)
+		b.slipT = b.t
+	}
+	if b.slipCell < 0 {
+		return false
+	}
+	b.slipOnT = b.t
+	return true
+}
+
+// kiteFrom returns the nearest attacker to back away from when two or more are on us (nil: do not kite).
+func (b *Bot) kiteFrom(ths []threat, nEngaged int) *threat {
+	if nEngaged < 2 || b.P.KiteMin <= 0 {
+		return nil
+	}
+	// opening the range only pays with a weapon that still hits out there
+	if b.P.KiteNeedsLaser && b.realModel() && b.has("laser") < 0 {
+		return nil
+	}
+	// lightning is a short-range weapon: with it and energy, stay in and brawl one at a time
+	if b.has("lightning") >= 0 && b.energy > 40 && b.has("laser") < 0 {
+		return nil
+	}
+	var near *threat
+	for i := range ths {
+		if ths[i].engaged && !ths[i].phantom && ths[i].tr.Listed && (near == nil || ths[i].d < near.d) {
+			near = &ths[i]
+		}
+	}
+	if near == nil || near.d > b.P.KiteMax+20 {
+		return nil
+	}
+	return near
 }
 
 // armed reports whether we hold anything besides the starting gun.
