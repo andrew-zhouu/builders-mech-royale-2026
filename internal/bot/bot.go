@@ -180,7 +180,7 @@ func baseParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
-		Salt:          0,
+		Salt:          1,
 		QuietSlip:     true, // do not start it with a mech that has not touched us, unless we hold a laser and it does not
 		QuietSlipMin:  40,
 		LaserMechOnly: true,
