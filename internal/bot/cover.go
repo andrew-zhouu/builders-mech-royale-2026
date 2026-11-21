@@ -10,6 +10,59 @@ package bot
 // shadow to a place that stays hidden when the attacker shifts sideways, and, with a hurt mech and the
 // attacker close, a place clearly farther from it as well (health comes back just as fast on the move).
 
+// shyPhase reports whether the opening rule applies: the first ShySecs of a match in a free-for-all
+// stance (see think for what it does and why).
+func (b *Bot) shyPhase(st stance) bool {
+	// (only once we know it is a free-for-all: against the practice squad it costs kills)
+	return b.P.ShySecs > 0 && b.ffa && st.avoid && b.t < b.P.ShySecs
+}
+
+// exposedTo reports whether a mech we saw in the last secs seconds, no farther than maxRange from us,
+// has a clear line from where we last saw it to where we stand. (We only see 120 degrees ahead: a mech
+// that has dropped out of our view has not lost sight of us.)
+func (b *Bot) exposedTo(secs, maxRange float64) bool {
+	for _, tr := range b.tracks {
+		if tr.NPC || b.t-tr.LastSeen > secs {
+			continue
+		}
+		if hyp(tr.Pos[0]-b.pos[0], tr.Pos[1]-b.pos[1]) > maxRange {
+			continue
+		}
+		sc := tr.scale(b.sizePerCube)
+		ex, ey, ez := tr.Pos[0], tr.Pos[1], tr.Pos[2]+8*sc
+		if b.W.Visible(ex, ey, ez, b.pos[0], b.pos[1], b.pos[2]+b.height*0.5) || b.W.Visible(ex, ey, ez, b.pos[0], b.pos[1], b.pos[2]+b.height*0.95) {
+			return true
+		}
+	}
+	return false
+}
+
+// mechSeenWithin reports whether we have seen another mech in the last secs seconds.
+func (b *Bot) mechSeenWithin(secs float64) bool {
+	for _, tr := range b.tracks {
+		if !tr.NPC && b.t-tr.LastSeen <= secs {
+			return true
+		}
+	}
+	return false
+}
+
+// coverClose reports whether there is somewhere out of every threat's sight within a few seconds' run:
+// RetreatRunMax metres of path, or RetreatRunLaser when a laser we cannot answer is on us (against that,
+// in the open, nothing else works). The answer is kept for half a second.
+func (b *Bot) coverClose(ths []threat, tgt *threat) bool {
+	if b.t-b.nearCoverT < 0.5 {
+		return b.nearCoverOK
+	}
+	reach := b.P.RetreatRunMax
+	if tgt != nil && tgt.tr.Laser && b.has("laser") < 0 && b.P.RetreatRunLaser > reach {
+		reach = b.P.RetreatRunLaser
+	}
+	b.nearCoverT = b.t
+	b.nearCoverOK = b.findCover(ths, reach) >= 0
+	return b.nearCoverOK
+}
+
 // deeperCover returns the nearest cell that is hidden from every recent threat's last known position and
 // from CoverMargin metres to either side of it, with the straight way there out of sight too. With
 // farther set and the nearest threat inside RunOnRange, the cell must also be RunOnGain metres farther

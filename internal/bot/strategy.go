@@ -375,9 +375,15 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 	var best *loot
 	// where the mechs we know about are looking from (for the out-of-sight preference)
 	var watchEyes [][3]float64
-	if b.P.LootHiddenBias > 0 && st.avoid {
+	// (the opening is stricter: see the "shy" rule in think)
+	strict := b.shyPhase(st)
+	mem := 4.0
+	if strict {
+		mem = b.P.ShyMem
+	}
+	if (b.P.LootHiddenBias > 0 || strict) && st.avoid {
 		for _, tr := range b.tracks {
-			if tr.NPC || b.t-tr.LastSeen > 4 {
+			if tr.NPC || b.t-tr.LastSeen > mem {
 				continue
 			}
 			sc := tr.scale(b.sizePerCube)
@@ -413,7 +419,40 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 		if b.enemyNear(l.pos, 45) && l.kind != "cube" {
 			value *= 0.35
 		}
-		if b.P.LootHiddenBias > 0 && st.avoid && len(watchEyes) > 0 {
+		isLaser := false
+		if l.kind == "pickup" && b.has("laser") < 0 {
+			if it := b.pickups[l.id]; it != nil && it.Kind == "laser" {
+				isLaser = true
+			}
+		}
+		if strict {
+			// opening: short errands (in the real matches mechs that had gone 60 m+ by 10 s did a
+			// point worse than those that had gone less), and sheltered ones before open ones
+			if b.P.ShyLootRadius > 0 && d > b.P.ShyLootRadius && !isLaser {
+				return
+			}
+			if b.P.ShyExposure > 0 {
+				if e := b.Nav.Exposure().At(b.Nav.Index(l.pos[0], l.pos[1])); e <= 1 {
+					value *= 1 - b.P.ShyExposure*float64(e)
+				}
+			}
+		}
+		if strict && len(watchEyes) > 0 {
+			// opening: nothing that would have us standing in a known mech's sight, or closing on it
+			// (a laser a few steps away excepted)
+			laserHere := isLaser && d < b.P.ShyLaser
+			if !laserHere {
+				for _, e := range watchEyes {
+					de := hyp(e[0]-l.pos[0], e[1]-l.pos[1])
+					if de < 230 && b.W.Visible(e[0], e[1], e[2], l.pos[0], l.pos[1], l.pos[2]+4.5) {
+						return
+					}
+					if de < 150 && de < hyp(e[0]-b.pos[0], e[1]-b.pos[1])-10 {
+						return
+					}
+				}
+			}
+		} else if b.P.LootHiddenBias > 0 && st.avoid && len(watchEyes) > 0 {
 			// errands out of other mechs' sight first: in the real matches everyone caught up in a
 			// fight in the first half minute, whoever started it, finished a point below the rest
 			for _, e := range watchEyes {

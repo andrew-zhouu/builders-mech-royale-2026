@@ -37,7 +37,9 @@ type Params struct {
 	FFALootRadius float64
 	FFAWantCubes  int
 	FFAReturnFire float64 // only shoot back at attackers closer than this
+	Salt          int     // changes the dice only (see New)
 	ForceFFA      bool    // testing: assume a free-for-all from the start
+	SlotRule      bool    // WRONG, never enable: the track page says the practice slot varies each match
 	CloseDisengage float64 // disengage threshold against an attacker within ~60 m (stealth stances)
 	DuelDisengage  float64 // leave a one-on-one only below this advantage
 
@@ -48,6 +50,7 @@ type Params struct {
 	RoofMinZone   float64 // stop using roofs when the next circle is smaller than this
 	ArmRadius     float64 // how far we go for a second weapon even while being watched
 	OpenSecs      float64 // how long we stay careful before assuming the cooperating squad
+	CreditOpenS   float64 // ... and for how long again after a death we credited to ourselves on a guess (0 = never)
 	DropRadius    float64 // how far we travel for a supply drop
 	LeaveTTD      float64 // with several attackers, leave when we would be dead in this many seconds
 	PatientSecs   float64 // squad stance: until this time (and below PatientCubes) farm instead of killing hunters (0 = off)
@@ -85,6 +88,15 @@ type Params struct {
 	RunOnRange      float64 // hurt and behind cover with the attacker last seen inside this range: keep going, deeper into cover (0 = stop at the first corner)
 	RunOnGain       float64 // ... each leg must put at least this much more distance between us
 	CoverMargin     float64 // cover must stay cover when the threat steps this far to either side (0 = the nearest hidden spot will do)
+	ShySecs         float64 // opening rule: for this long, position before loot while a mech is in view (0 = off)
+	ShyRange        float64 // ... a mech in view inside this range counts
+	ShyLaser        float64 // ... a laser this close is taken whatever the view
+	ShyMem          float64 // ... mechs seen this long ago still count for what we may fetch
+	ShyBoost        float64 // ... sprint to cover while energy is above this (0 = walk)
+	ShyLootRadius   float64 // ... nothing but a laser from farther than this (0 = no limit)
+	ShyExposure     float64 // ... loot in open ground is worth this much less (0..1)
+	RetreatRunMax   float64 // brawl stance: in an attacker's sights, only run for cover within this many metres of path; otherwise fight on (0 = always run)
+	RetreatRunLaser float64 // ... against a laser we cannot answer
 	LootHiddenBias  float64 // brawl stance: loot in plain sight of a mech we know about is worth this much less (0..1)
 	CoverEdgeAdv    float64 // ... unless our estimated advantage is at least this (a laser against none needs only AvoidAdv)
 	HuntLaserEdge   bool    // brawl stance: start a fight only with a laser against a mech without one (or at CoverEdgeAdv)
@@ -141,6 +153,8 @@ func DefaultParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
+		Salt:          1,
+		// SlotRule stays off: the track page says the practice slot varies each match
 		FFAEngage:     1.8,
 		FFADisengage:  0.95,
 		FFALootRadius: 140,
@@ -154,6 +168,7 @@ func DefaultParams() Params {
 		RoofMinZone:    60,
 		ArmRadius:      110,
 		OpenSecs:       24,
+		CreditOpenS:    25,
 		DropRadius:     300,
 		LeaveTTD:       10,
 		UseHideMap:     false, // stealth hideouts: unused by the brawl stance (kept for the variants)
@@ -186,6 +201,18 @@ func DefaultParams() Params {
 		RunOnRange:        80,
 		RunOnGain:         18,
 		CoverMargin:       8,
+		// The opening rule is off (ShySecs 25 with SlotRule: variant b-shy). It does what it says (at
+		// 10 s in sight 45% against 55%, inside 100 m and seen 16% against 26%, hit inside 20 s 55%
+		// against 66%) but gives up a quarter of the early lasers, and in the re-enactment the deaths
+		// only move from before 30 s to after it: about +0.1 points by the real-match index. Against
+		// the practice squad it costs 0.4, hence the SlotRule it would need.
+		ShyRange:          220,
+		ShyLaser:          60,
+		ShyMem:            6,
+		// RetreatRunMax 50 / RetreatRunLaser 90 (variant b-standrun) is not on: the real matches favour it
+		// (one attacker inside 60 m, shot back: alive 20 s later 35% staying against 23% running),
+		// every simulator here puts it 0.1-0.2 points behind, and either way it is a small thing.
+		RetreatRunLaser:   90,
 		HuntLaserEdge:     true,
 		LootHiddenBias:    0.5,
 		CoverMinRange:     40,
@@ -380,6 +407,10 @@ type Bot struct {
 	deepCell   int     // retreat: the next place deeper into cover we are walking to (-1 none)
 	deepT      float64 // ... when we chose it
 	deepTryT   float64 // ... when we last looked for one
+	standT      float64 // last time we stayed in a fight for want of cover close by
+	creditAbsorbT float64 // last death we put down to our own shooting without being given the kill
+	nearCoverT  float64 // coverClose: when we last looked
+	nearCoverOK bool    // ... and what we found
 	lootID     int
 	lootT      float64
 	holdCell   int
@@ -470,7 +501,9 @@ func Factory(h *proto.Hello, w *world.World, nav *world.Nav) *Bot {
 
 func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	b := &Bot{P: p, H: h, C: &h.Config, W: w, Nav: nav}
-	b.rng = rand.New(rand.NewSource(h.Seed*7919 + int64(h.Slot) + 1))
+	// (Salt: builds that differ only in it play the same game with different dice. Practice is 48 fixed
+	// hidden matches, so each such build is a fresh draw of the same strength.)
+	b.rng = rand.New(rand.NewSource(h.Seed*7919 + int64(h.Slot) + 1 + int64(p.Salt)*104729))
 	hz := stat(h.Config.Match, "tick_hz", 20)
 	if hz <= 0 {
 		hz = 20
@@ -487,6 +520,9 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	b.lootID = -1
 	b.coverCell = -1
 	b.deepCell, b.deepT, b.deepTryT = -1, -100, -100
+	b.nearCoverT = -100
+	b.standT = -100
+	b.creditAbsorbT = -100
 	b.holdCell = -1
 	b.evadeCell = -1
 	b.lastDamageT = -100

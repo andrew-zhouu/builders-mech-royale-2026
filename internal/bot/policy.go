@@ -128,6 +128,14 @@ func (b *Bot) think(act *proto.Action) {
 			// cornered by one pursuer we cannot shake: shooting back beats being shot in the back
 			b.retreating = false
 			b.corneredT = b.t
+		case b.P.RetreatRunMax > 0 && st.avoid && visibleFoe && b.t-b.retreatT > 0.5 && !b.coverClose(ths, tgt):
+			// In its sights with nothing to get behind for seconds: in the real matches a hurt mech
+			// still in its attacker's sight 8 s later lived 34% of the time when it stood and shot
+			// back, 24% when it shot back on the run, 10% when it only ran (56% when it got out of
+			// sight in time). So no long runs in the open: have it out.
+			b.retreating = false
+			b.corneredT = b.t
+			b.standT = b.t
 		}
 	} else if danger && b.t-b.corneredT > 4 {
 		leave := false
@@ -152,6 +160,10 @@ func (b *Bot) think(act *proto.Action) {
 		default:
 			// shot by something we have not seen
 			leave = underFire && phantoms > 0 && (ttd < 1.5*b.P.LeaveTTD || hpFrac < 0.6)
+		}
+		if leave && b.P.RetreatRunMax > 0 && st.avoid && visibleFoe && !b.coverClose(ths, tgt) {
+			leave = false // (see above: running is only worth it with cover seconds away)
+			b.standT = b.t
 		}
 		if leave {
 			b.retreating = true
@@ -251,6 +263,9 @@ func (b *Bot) think(act *proto.Action) {
 						fightWhy = ".close"
 					default:
 						fightWhy = ".nocover"
+					}
+					if b.t-b.standT < 1.0 {
+						fightWhy = ".stand" // we would have run, had there been anything close to run to
 					}
 				}
 			default:
@@ -407,6 +422,26 @@ func (b *Bot) think(act *proto.Action) {
 		b.roofFirstOK = ok
 	}
 	roofFirst := roofWanted && !onRoof && b.t < b.P.RoofFirstSecs && b.roofFirstOK && b.roofFirstChecked
+	// Opening: where we stand ten seconds in decides more than what we hold. In the real matches (mapan
+	// opening, 857 mechs alive at 10 s) those out of the nearest mech's sight and 150 m+ from it were
+	// dead inside a minute 18% of the time and finished on 10.0 points; those inside 100 m and in its
+	// sight, 58% and 5.8; a laser in hand by 15 s was worth 1.2 to 2.2 points within each of those
+	// classes: less than either step. Line of sight works both ways, so "seen" is simply "we can see
+	// a mech": while that is so, we loot only what lies out of its sight and no nearer to it (the
+	// loot chooser is strict in this phase), and failing that we get out of its sight first.
+	shy := false
+	var shyLoot *loot
+	if b.shyPhase(st) && !wantFight && !slip && !peek && !roofDuck && !b.retreating && !onRoof {
+		// (judged from where we last saw each of them, not from whether it is in our 120 degree
+		// wedge this instant; someone looking at us or plinking from afar counts all the more)
+		shy = b.exposedTo(b.P.ShyMem, b.P.ShyRange)
+		if shy {
+			shyLoot = b.chooseLoot(false, st)
+			if shyLoot != nil && dist2(b.pos, shyLoot.pos) <= 60 {
+				shy = false // something safe close by: taking it hides us as well
+			}
+		}
+	}
 	// a roof approach that other business interrupted for a while starts over
 	if b.roof.state == roofApproach && b.t-b.roof.stepT > 2.5 {
 		b.roof.state = roofNone
@@ -588,6 +623,37 @@ func (b *Bot) think(act *proto.Action) {
 		}
 		rq.fenceRoof = onRoof && roofWanted
 
+	case shy:
+		b.mode = "shy"
+		if b.t-b.evadeT > 0.6 {
+			b.evadeCell = b.findCover(ths, 110)
+			b.evadeT = b.t
+		}
+		switch {
+		case b.evadeCell >= 0:
+			cx, cy := b.Nav.Pos(b.evadeCell)
+			if d := setGoal(cx, cy, 2.2, b.P.ShyBoost > 0 && b.energy > b.P.ShyBoost); d < 0.9 || (d < 3.0 && b.hiddenHere(ths)) {
+				rq.wantW = 0
+				rq.hold = true
+			}
+		case shyLoot != nil:
+			// nothing to get behind in reach: the errand out of their sight, far as it is
+			setGoal(shyLoot.pos[0], shyLoot.pos[1], 2.0, false)
+		default:
+			// nothing at all: open the distance to the nearest of them
+			var nearest *threat
+			for i := range ths {
+				if tr := ths[i].tr; b.t-tr.LastSeen <= b.P.ShyMem && (nearest == nil || ths[i].d < nearest.d) {
+					nearest = &ths[i]
+				}
+			}
+			if nearest != nil {
+				dx, dy := norm2(b.pos[0]-nearest.tr.Pos[0], b.pos[1]-nearest.tr.Pos[1])
+				setGoal(b.pos[0]+dx*40, b.pos[1]+dy*40, 2.0, false)
+			}
+		}
+		holdFire = true
+
 	case b.pest() != nil && (!st.stealth || len(watchers) == 0):
 		// a drone is plinking at us: it blocks our regen and it is worth two cubes, so kill it
 		tr := b.pest()
@@ -704,7 +770,12 @@ func (b *Bot) think(act *proto.Action) {
 		} else {
 			b.lootID = -1
 			b.mode = "hold"
-			if zi.final {
+			if b.shyPhase(st) && !onRoof && b.mechSeenWithin(b.P.ShyMem) {
+				// opening, out of their sight, and nothing safe to fetch: stay out of it for now
+				b.mode = "lie-low"
+				rq.wantW = 0
+				rq.hold = true
+			} else if zi.final {
 				// last circle: stand on the centre
 				if d := setGoal(b.o.Zone.NextCenter[0], b.o.Zone.NextCenter[1], 1.5, false); d < 2 {
 					rq.wantW = 0

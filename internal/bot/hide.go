@@ -30,7 +30,15 @@ func (b *Bot) realModel() bool {
 	if b.P.HitModel < 1 {
 		return false
 	}
-	return !b.P.PracticeAware || b.ffa || b.t < b.P.OpenSecs
+	return !b.P.PracticeAware || b.ffa || b.openPhase()
+}
+
+// openPhase reports whether we still do not know what kind of lobby this is: the first OpenSecs, and
+// for CreditOpenS after a death that we put down to our own shooting without having been given the kill
+// (in a free-for-all that is usually somebody else's kill, and one such guess must not send us into the
+// practice stance in the middle of a real fight).
+func (b *Bot) openPhase() bool {
+	return b.t < b.P.OpenSecs || (b.P.CreditOpenS > 0 && b.t-b.creditAbsorbT < b.P.CreditOpenS)
 }
 
 // belief updates what we think the lobby is and returns the matching stance.
@@ -58,6 +66,7 @@ func (b *Bot) belief() stance {
 			}
 			if mine {
 				n--
+				b.creditAbsorbT = b.t
 			}
 		}
 		if n > 0 {
@@ -71,6 +80,13 @@ func (b *Bot) belief() stance {
 	if b.P.ForceFFA {
 		b.ffa = true
 	}
+	// The seat tells: in every public lobby with house bots (60 recorded) the players sit in the lowest
+	// seats and the house bots fill the rest, so in practice (us and 15 house bots) we are in seat 0;
+	// where all 16 are team bots the seats are shuffled. Any other seat is a free-for-all from the
+	// first tick. (Should practice ever seat us elsewhere, its score will say so at once.)
+	if b.P.SlotRule && b.H.Slot != 0 {
+		b.ffa = true
+	}
 	switch {
 	case alive <= 2:
 		// second place is banked: nothing to lose by fighting for first
@@ -80,7 +96,7 @@ func (b *Bot) belief() stance {
 			return b.brawlStance("ffa")
 		}
 		return stance{name: "ffa", engageRatio: b.P.FFAEngage, disengage: b.P.FFADisengage, hunt: false, stealth: true, lootRadius: b.P.FFALootRadius, wantCubes: b.P.FFAWantCubes}
-	case b.t < b.P.OpenSecs && b.P.PracticeAware:
+	case b.openPhase() && b.P.PracticeAware:
 		if b.P.Brawl {
 			return b.brawlStance("open")
 		}

@@ -114,9 +114,29 @@ func Variants() map[string]func(p *Params) {
 		"b-jitj":  func(p *Params) { p.StrafeMin, p.StrafeMax = 0.25, 0.55; p.Jink = 0.6 },
 		// v0.7 and v0.7.1 exactly as published
 		"v07":  func(p *Params) { v07(p) },
-		"v071": func(p *Params) { p.EdgeHold = 0; p.NoMortar = false; p.RunOnRange = 0; p.CoverMargin = 0 },
-		"v072": func(p *Params) { p.NoMortar = false; p.RunOnRange = 0; p.CoverMargin = 0 },
-		"v073": func(p *Params) { p.RunOnRange = 0; p.CoverMargin = 0 },
+		"v071": func(p *Params) { v074(p); p.EdgeHold = 0; p.NoMortar = false; p.RunOnRange = 0; p.CoverMargin = 0 },
+		"v072": func(p *Params) { v074(p); p.NoMortar = false; p.RunOnRange = 0; p.CoverMargin = 0 },
+		"v073": func(p *Params) { v074(p); p.RunOnRange = 0; p.CoverMargin = 0 },
+		"v074": func(p *Params) { v074(p) },
+		"b-standrun": func(p *Params) { p.RetreatRunMax = 50 },
+		// the opening rule (position before loot while a mech is in view): off, and other settings
+		"s1":         func(p *Params) { p.Salt = 1 },
+		"s2":         func(p *Params) { p.Salt = 2 },
+		"s3":         func(p *Params) { p.Salt = 3 },
+		"s4":         func(p *Params) { p.Salt = 4 },
+		"s5":         func(p *Params) { p.Salt = 5 },
+		"s6":         func(p *Params) { p.Salt = 6 },
+		"b-shy":      func(p *Params) { p.SlotRule = true; p.ShySecs = 25 },
+		"b-slotonly": func(p *Params) { p.SlotRule = true },
+		"b-ffa0":     func(p *Params) { p.ForceFFA = true },
+		"b-shy40":    func(p *Params) { p.SlotRule = true; p.ShySecs = 40 },
+		"b-shyb":     func(p *Params) { p.SlotRule = true; p.ShySecs = 25; p.ShyBoost = 40 },
+		"b-shyr90":   func(p *Params) { p.SlotRule = true; p.ShySecs = 25; p.ShyLootRadius = 90 },
+		"b-shyall":   func(p *Params) { p.SlotRule = true; p.ShySecs = 25; p.ShyBoost = 40; p.ShyLootRadius = 90; p.ShyExposure = 0.6 },
+		"b-nocredit2": func(p *Params) { p.CreditOpenS = 0 },
+		// only run for cover that is seconds away: other reaches
+		"b-rr35": func(p *Params) { p.RetreatRunMax = 35 },
+		"b-rr70": func(p *Params) { p.RetreatRunMax = 70 },
 		// cover that lasts (cover.go): the parts on their own, and other settings
 		"b-run0":   func(p *Params) { p.RunOnRange = 0 },
 		"b-cm0":    func(p *Params) { p.CoverMargin = 0 },
@@ -210,7 +230,17 @@ func v05(p *Params) {
 	p.RoofStandCheck = false
 	p.RunOnRange = 0
 	p.CoverMargin = 0
+	p.RetreatRunMax = 0
+	p.CreditOpenS = 0
 	oldLead(p)
+}
+
+// v074 restores the parameters of the published v0.7.4.
+func v074(p *Params) {
+	p.RetreatRunMax = 0
+	p.CreditOpenS = 0
+	p.ShySecs = 0
+	p.SlotRule = false
 }
 
 // oldLead is the gun lead of every build up to v0.6.1: instantaneous velocity, damped to 75%.
@@ -242,6 +272,8 @@ func v061(p *Params) {
 	p.NoMortar = false
 	p.RunOnRange = 0
 	p.CoverMargin = 0
+	p.RetreatRunMax = 0
+	p.CreditOpenS = 0
 	oldLead(p)
 }
 
@@ -254,6 +286,8 @@ func v07(p *Params) {
 	p.NoMortar = false
 	p.RunOnRange = 0
 	p.CoverMargin = 0
+	p.RetreatRunMax = 0
+	p.CreditOpenS = 0
 }
 
 // brawl2 is the armed-farmer parameter set (the defaults since v0.6): the published practice behaviour
