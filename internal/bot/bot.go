@@ -79,6 +79,16 @@ type Params struct {
 	AvoidAdv        float64 // attacked from beyond AvoidRange with less advantage than this: slip behind cover, shooting back (0 = always stand and fight)
 	AvoidRange      float64
 	AvoidCover      float64 // ... if cover is within this path length
+	CoverFirst      bool    // brawl stance: hit by someone we have no clear edge over, go for cover first (any range beyond CoverMinRange, light fire included)
+	CoverMinRange   float64
+	LootHiddenBias  float64 // brawl stance: loot in plain sight of a mech we know about is worth this much less (0..1)
+	CoverEdgeAdv    float64 // ... unless our estimated advantage is at least this (a laser against none needs only AvoidAdv)
+	HuntLaserEdge   bool    // brawl stance: start a fight only with a laser against a mech without one (or at CoverEdgeAdv)
+	Peek            bool   // brawl stance with a laser: fight from behind cover (charge hidden, step out to fire)
+	PeekCover       float64 // ... if a hidden cell is within this path length
+	PeekReach       float64 // ... and a firing cell within this many metres of it
+	PeekMinRange    float64 // ... and the target is farther than this (closer than that it is a brawl)
+	OverlandEarly   float64 // when the next circle cannot be walked to, allow this many times the usual travel time plus 25 s (0 = the old rule)
 	RoofCoverHold   float64 // brawl stance: stay behind the roof edge this long after the last watcher (0 = step back out at once)
 	RoofStandCheck  bool    // stay on a roof only if the spot we would stand at is inside the next circle
 	DropStick       bool    // supply drops: stay on one once chosen; skip them when at the cube cap and healthy (brawl stance)
@@ -166,6 +176,14 @@ func DefaultParams() Params {
 		AvoidRange:        85,
 		AvoidCover:        55,
 		ZoneSlack:         10,
+		CoverFirst:        true,
+		HuntLaserEdge:     true,
+		LootHiddenBias:    0.5,
+		CoverMinRange:     40,
+		CoverEdgeAdv:      3.0,
+		PeekCover:         25,
+		PeekReach:         9,
+		PeekMinRange:      45,
 		RoofCoverHold:     6,
 		RoofStandCheck:    true,
 		DropStick:         true,
@@ -403,6 +421,7 @@ type Bot struct {
 	roofCoverC  int
 	roofCoverT  float64
 	unquietT    float64  // last time someone was near or watching
+	peek        peekPlan // laser fight from behind cover: the current hide and fire cells
 	roofCoverHoldT float64 // last time something made us duck behind the roof edge
 	holdClimb   bool     // do not start jetting up a wall right now (someone is watching or shooting)
 	holdRoofMove bool    // do not leave the roof we are on right now (same reason; the zone is not close yet)
@@ -477,6 +496,7 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	b.slipCell, b.slipT, b.slipOnT = -1, -100, -100
 	b.jinkSign, b.jinkT = 1, -100
 	b.roofCoverHoldT = -100
+	b.peek = peekPlan{t: -100, tgt: -1, roof: -1, duck: -1, fire: -1}
 	if p.UseHideMap || p.HoldHideMap {
 		b.hm = getHideMap(nav)
 	}

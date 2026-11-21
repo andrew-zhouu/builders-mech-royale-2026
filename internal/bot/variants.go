@@ -112,7 +112,31 @@ func Variants() map[string]func(p *Params) {
 		"b-jit":   func(p *Params) { p.StrafeMin, p.StrafeMax = 0.25, 0.55 },
 		"b-jit2":  func(p *Params) { p.StrafeMin, p.StrafeMax = 0.2, 0.42 },
 		"b-jitj":  func(p *Params) { p.StrafeMin, p.StrafeMax = 0.25, 0.55; p.Jink = 0.6 },
+		// v0.7 exactly as published
+		"v07": func(p *Params) { v07(p) },
+		// the rules read off the real first-contact data: cover unless laser-against-none; hunt only then
+		"b-real":    func(p *Params) { p.CoverFirst = true; p.HuntLaserEdge = true },
+		"b-realh":   func(p *Params) { p.CoverFirst = true; p.HuntLaserEdge = true; p.HuntRangeLaser = 200 },
+		"b-realc":   func(p *Params) { p.CoverFirst = true },
+		"b-realx":   func(p *Params) { p.HuntLaserEdge = true },
+		"b-realb5":  func(p *Params) { p.CoverFirst = true; p.HuntLaserEdge = true; p.LootHiddenBias = 0.5 },
+		"b-realb8":  func(p *Params) { p.CoverFirst = true; p.HuntLaserEdge = true; p.LootHiddenBias = 0.8 },
+		"b-cf":      func(p *Params) { p.CoverFirst = true },
+		"b-cf60":    func(p *Params) { p.CoverFirst = true; p.CoverMinRange = 60 },
+		"b-cf90c":   func(p *Params) { p.CoverFirst = true; p.AvoidCover = 90 },
+		"b-cf15":    func(p *Params) { p.CoverFirst = true; p.AvoidAdv = 1.5 },
+		"b-cf20":    func(p *Params) { p.CoverFirst = true; p.AvoidAdv = 2.0 },
+		"b-cf30":    func(p *Params) { p.CoverFirst = true; p.AvoidAdv = 3.0 },
+		"b-cf99":    func(p *Params) { p.CoverFirst = true; p.AvoidAdv = 99 },
+		"b-cf20h":   func(p *Params) { p.CoverFirst = true; p.AvoidAdv = 2.0; p.BrawlEngage = 2.0 },
+		"b-cf99h":   func(p *Params) { p.CoverFirst = true; p.AvoidAdv = 99; p.BrawlHunt = false },
+		"b-cfpeek":  func(p *Params) { p.CoverFirst = true; p.Peek = true },
+		"b-peek":    func(p *Params) { p.Peek = true },
+		"b-peek14":  func(p *Params) { p.Peek = true; p.PeekReach = 14; p.PeekCover = 40 },
+		"b-peekh":   func(p *Params) { p.Peek = true; p.HuntRangeLaser = 200 },
 		"b-noslack": func(p *Params) { p.ZoneSlack = 0 },
+		"b-oe2":     func(p *Params) { p.OverlandEarly = 2.5 },
+		"b-oe4":     func(p *Params) { p.OverlandEarly = 4 },
 		"b-rc3":     func(p *Params) { p.RoofCenterW = 0.3 },
 		"b-rc6":     func(p *Params) { p.RoofCenterW = 0.6 },
 		"b-rlq":     func(p *Params) { p.RoofLeaveQuiet = 25 },
@@ -201,7 +225,17 @@ func v061(p *Params) {
 	p.AvoidCoverLaser = 0
 	p.RoofLeaveQuiet = 0
 	p.DropStick = false
+	p.CoverFirst = false
+	p.HuntLaserEdge = false
+	p.LootHiddenBias = 0
 	oldLead(p)
+}
+
+// v07 restores the parameters of the published v0.7.
+func v07(p *Params) {
+	p.CoverFirst = false
+	p.HuntLaserEdge = false
+	p.LootHiddenBias = 0
 }
 
 // brawl2 is the armed-farmer parameter set (the defaults since v0.6): the published practice behaviour

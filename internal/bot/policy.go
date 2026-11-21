@@ -173,6 +173,7 @@ func (b *Bot) think(act *proto.Action) {
 	plink := false      // lightly attacked from range: keep farming and shoot back in between
 	unprovoked := false // watched from range by someone who has not touched us: do not start it
 	roofDuck := false   // on our roof and attacked without an edge: step back behind the roof's edge
+	fightWhy := ""      // label suffix: why the brawl stance chose to stand and fight
 	onRoof := b.onRoof() >= 0 && b.o.Self.Grounded
 	roofWanted := b.roofWanted(st, zi)
 	huntR := b.P.HuntRange
@@ -201,9 +202,20 @@ func (b *Bot) think(act *proto.Action) {
 				far := tgt.d >= b.P.AvoidRange && tgt.adv < b.P.AvoidAdv
 				// heavy fire (a laser, or a gun that is actually landing) needs cover; light fire does not
 				heavy := tgt.tr.Laser || b.recentDmg/3.0 > b.P.PlinkMaxDPS || hpFrac < 0.5 || nEngaged >= 2
+				// Cover first (real matches, 1,463 first hits on a mech, all teams): those who got out
+				// of the attacker's line within a few seconds were alive 20 s later 77% of the time and
+				// finished on 10.9 points; those who stayed in view and shot back, 55% and 9.4; against a
+				// laser with none of their own, 69% against 24%. Standing to fight matched cover only
+				// for a mech with a laser against one without.
+				// (the edge that counts: our laser against none, or an estimate so lopsided that the
+				// fight is nearly over)
+				edge := (b.laserEdge(tgt.tr) && tgt.adv >= b.P.AvoidAdv) || tgt.adv >= b.P.CoverEdgeAdv
+				coverFirst := b.P.CoverFirst && provoked && !edge && tgt.d >= b.P.CoverMinRange
 				switch {
 				case !provoked:
 					unprovoked = true // carry on; the torso keeps an eye on it, guns quiet
+				case coverFirst && !(onRoof && roofWanted) && b.slipFromX(tgt, ths, true):
+					slip = true
 				case onRoof && roofWanted && !b.enemyOnRoof(ths):
 					// up here we do what the published bot did in its real matches (9 damage a second
 					// on roofs against 32 elsewhere): out of sight behind the edge, shooting back on
@@ -217,17 +229,46 @@ func (b *Bot) think(act *proto.Action) {
 					slip = true
 				default:
 					wantFight = true
+					// (why we stand and fight, for the telemetry label)
+					switch {
+					case tgt.adv >= b.P.AvoidAdv:
+						fightWhy = ".edge"
+					case tgt.d < b.P.AvoidRange && !(b.P.CoverFirst && tgt.d >= b.P.CoverMinRange):
+						fightWhy = ".close"
+					default:
+						fightWhy = ".nocover"
+					}
 				}
 			default:
 				wantFight = true
 			}
-		case st.hunt && tgt.adv >= st.engageRatio && tgt.d < huntR && tgt.tr.LOS && hpFrac > 0.6:
+		case st.hunt && tgt.adv >= st.engageRatio && tgt.d < huntR && tgt.tr.LOS && hpFrac > 0.6 &&
+			// (real matches: the one who fires first comes out ahead only with a laser against none:
+			// 11.1 final points against the victim's 9.1; level otherwise, and 2 points behind when it
+			// is the victim that has the laser)
+			(!b.P.HuntLaserEdge || !st.avoid || b.laserEdge(tgt.tr) || tgt.adv >= b.P.CoverEdgeAdv):
 			wantFight = true
+			fightWhy = ".hunt"
 		case st.name == "duel" && hpFrac > 0.5:
 			wantFight = true
 		case st.stealth && tgt.tr.LOS && tgt.d < 85 && tgt.tr.HP < 0.25*math.Max(tgt.tr.MaxHP, 1) && tgt.adv > 1.5:
 			// a nearly dead mech in reach: finish it for the cubes
 			wantFight = true
+		}
+	}
+	// With a laser and cover at hand, fight from behind it (see peek.go) instead of trading in the
+	// open, running for cover or just ducking.
+	peek := false
+	peekLi := b.has("laser")
+	if b.P.Peek && st.avoid && peekLi >= 0 && tgt != nil && !b.retreating && tgt.tr.Listed && !tgt.tr.NPC &&
+		(wantFight || slip || roofDuck) && tgt.d > b.P.PeekMinRange && tgt.d < 272 {
+		roofID := -1
+		if onRoof && roofWanted {
+			roofID = b.onRoof()
+		}
+		if b.peekPlanFor(tgt, ths, roofID) {
+			peek = true
+			wantFight, slip, roofDuck = false, false, false
 		}
 	}
 	if plink && b.chooseLoot(true, st) == nil {
@@ -301,7 +342,8 @@ func (b *Bot) think(act *proto.Action) {
 		return d
 	}
 	holdFire := false
-	direct := false // the action's movement was written directly (jet climb): skip the ground planner
+	peekCharge := false // peek fight: start charging the laser now, out of sight
+	direct := false     // the action's movement was written directly (jet climb): skip the ground planner
 	// jetting up a wall in someone's sights is how we died in our first real match
 	b.holdClimb = st.avoid && (len(watchers) > 0 || underFire)
 	if st.avoid && !b.holdClimb {
@@ -381,6 +423,18 @@ func (b *Bot) think(act *proto.Action) {
 		b.roofClimbStep(act)
 		direct = true
 
+	case peek:
+		// laser fight from behind cover: hidden while charging and cooling, out for the shot
+		b.mode = "peek"
+		cell, charge := b.peekStep(ths, peekLi, hpFrac)
+		peekCharge = charge
+		gx, gy := b.Nav.Pos(cell)
+		if d := setGoal(gx, gy, 2.6, false); d < 1.0 {
+			rq.wantW = 0
+			rq.hold = true
+		}
+		rq.fenceRoof = onRoof && roofWanted
+
 	case roofCoverCell >= 0:
 		// up here the roof edge is our cover: step to where they cannot see us instead of trading
 		b.mode = "roof-cover"
@@ -430,7 +484,7 @@ func (b *Bot) think(act *proto.Action) {
 		}
 
 	case wantFight:
-		b.mode = "fight"
+		b.mode = "fight" + fightWhy
 		if w := b.weaponRun(32); w != nil && !onRoof {
 			// a better weapon lying right here beats another second of shooting
 			b.mode = "fight+arm"
@@ -674,9 +728,12 @@ func (b *Bot) think(act *proto.Action) {
 	case plink && shootItem != nil:
 		// farming under light fire from range: the crate (a cube, maybe a weapon) comes first
 		b.engage(act, *shootItem, true, true, shootHP, true)
-	case tgt != nil && !holdFire && !unprovoked && (wantFight || tgt.engaged || b.retreating):
+	case tgt != nil && !holdFire && !unprovoked && (wantFight || tgt.engaged || b.retreating || peek):
 		at := b.targetOf(tgt.tr)
 		b.engage(act, at, tgt.tr.LOS, b.t-tgt.tr.LOST < 0.8, tgt.tr.HP, true)
+		if peekCharge && peekLi >= 0 {
+			act.Fire[peekLi] = true // charging needs no line of sight
+		}
 	case shootItem != nil:
 		b.engage(act, *shootItem, true, true, shootHP, true)
 	case tgt != nil && (tgt.tr.LOS || b.t-tgt.tr.LastSeen < 3):
@@ -773,10 +830,28 @@ func (b *Bot) weaponRun(maxD float64) *Item {
 // slipFrom decides whether to decline an exchange at range: true when the attacker is beyond AvoidRange,
 // we have no clear edge over it, and there is cover close by (left in b.slipCell).
 func (b *Bot) slipFrom(tgt *threat, ths []threat) bool {
+	return b.slipFromX(tgt, ths, false)
+}
+
+// laserEdge reports whether we hold a laser and this mech does not: the one situation in which, in
+// the real matches, standing to fight (or starting the fight) paid.
+func (b *Bot) laserEdge(tr *Track) bool {
+	return b.has("laser") >= 0 && !tr.Laser
+}
+
+// slipFromX is slipFrom; with anyEdge it goes for cover whatever our estimated advantage (the caller
+// has already decided this is not a fight to stand in).
+func (b *Bot) slipFromX(tgt *threat, ths []threat, anyEdge bool) bool {
 	minR, maxAdv := b.P.AvoidRange, b.P.AvoidAdv
+	if b.P.CoverFirst && b.P.CoverMinRange < minR {
+		minR = b.P.CoverMinRange
+	}
 	if b.t-b.slipOnT < 1.0 {
 		// already slipping: do not flip back and forth on the threshold
 		minR, maxAdv = minR*0.85, maxAdv*1.15
+	}
+	if anyEdge {
+		maxAdv = 1e9
 	}
 	if b.P.AvoidAdv <= 0 || tgt.d < minR || tgt.adv >= maxAdv {
 		return false
