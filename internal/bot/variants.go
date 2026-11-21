@@ -126,6 +126,14 @@ func Variants() map[string]func(p *Params) {
 		"h-v05fix":   func(p *Params) { p.FFASwap = "v05fix" },
 		// ... and with the v0.5 opening as well: h3 = v0.5 opening then this build, h3s = v0.5 opening,
 		// v0.5 in a free-for-all, this build only against the practice squad
+		// roof first, farm later: the v0.5 opening, then this build with roofs wanted at once
+		"ffa-rf":     func(p *Params) { p.BrawlRoofAfter = 0; p.RoofFarmAfter = 60 },
+		"ffa-rf45":   func(p *Params) { p.BrawlRoofAfter = 0; p.RoofFarmAfter = 45 },
+		"ffa-rf90":   func(p *Params) { p.BrawlRoofAfter = 0; p.RoofFarmAfter = 90 },
+		"h3r":        func(p *Params) { p.OpenSet = "v05"; p.FFASwap = "ffa-rf" },
+		"h3r45":      func(p *Params) { p.OpenSet = "v05"; p.FFASwap = "ffa-rf45" },
+		"h3r90":      func(p *Params) { p.OpenSet = "v05"; p.FFASwap = "ffa-rf90" },
+		"h1r":        func(p *Params) { p.FFASwap = "ffa-rf" },
 		"h3":         func(p *Params) { p.OpenSet = "v05" },
 		"h3s":        func(p *Params) { p.OpenSet = "v05"; p.FFASwap = "v05" },
 		"b-noquiet":  func(p *Params) { p.QuietSlip = false },

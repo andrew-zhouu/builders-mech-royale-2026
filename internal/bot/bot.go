@@ -126,6 +126,7 @@ type Params struct {
 	BrawlRoofs      bool    // brawl stance, free-for-all known: wait on a roof once armed for it
 	BrawlRoofCubes  int     // ... which means a laser, or this many cubes,
 	BrawlRoofAfter  float64 // ... or this much match time
+	RoofFarmAfter   float64 // free-for-all, roof wanted: before this time nothing but loot at our feet (or a laser close by); after it we come down to farm when it is quiet (0 = the roof is left only for a laser)
 	Jink            float64 // zig-zag (sideways share of the heading) while walking somewhere under gun fire from range (0 = off)
 	LeadPersist     bool    // scale the gun lead by how straight the target has been moving (jitterers get none)
 	LeadCum         bool    // per opponent, aim the way (lead / no lead) that has been missing by less while it fights us
@@ -148,7 +149,22 @@ type Params struct {
 	RoofFirstDist float64 // ... if an access point is within this distance
 }
 
+// BuildVariant names the variant a published build plays by default ("" = the base set as written
+// below). tools/variant_export.sh sets it for an export and puts it back.
+var BuildVariant = "h3r45"
+
+// DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
+	p := baseParams()
+	if BuildVariant != "" {
+		if f := Variants()[BuildVariant]; f != nil {
+			f(&p)
+		}
+	}
+	return p
+}
+
+func baseParams() Params {
 	return Params{
 		Name:          "ironclad",
 		EngageRatio:   1.25,
@@ -164,7 +180,7 @@ func DefaultParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
-		Salt:          3,
+		Salt:          0,
 		QuietSlip:     true, // do not start it with a mech that has not touched us, unless we hold a laser and it does not
 		QuietSlipMin:  40,
 		LaserMechOnly: true,

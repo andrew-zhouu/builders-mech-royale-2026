@@ -762,9 +762,23 @@ func (b *Bot) think(act *proto.Action) {
 		if (!st.stealth || quiet) && !roofFirst {
 			l = b.chooseLoot(danger && !patient, st)
 		}
-		if l != nil && onRoof && roofWanted && l.kind != "drop" && !(l.kind == "pickup" && b.has("laser") < 0 && dist2(b.pos, l.pos) < 90) {
-			// hidden on a roof: only a weapon we badly want is worth coming down for
+		// Roof first, farm later (RoofFarmAfter, free-for-all stance): the first minute on the ground is
+		// when the rushers are about (real matches: the build that farmed first died inside 30 s in 2
+		// of 6, the one that climbed first in 2 of 24), so until then only what lies at our feet or a
+		// laser close by; after that we come down to farm when it has been quiet, and go back up.
+		roofFarm := b.P.RoofFarmAfter > 0 && st.avoid && st.name == "ffa" && roofWanted
+		earlyRoof := roofFarm && b.t < b.P.RoofFarmAfter
+		laserNear := l != nil && l.kind == "pickup" && b.has("laser") < 0 && dist2(b.pos, l.pos) < 90
+		if l != nil && earlyRoof && !onRoof && l.kind != "drop" && !laserNear && dist2(b.pos, l.pos) > 25 {
 			l = nil
+		}
+		if l != nil && onRoof && roofWanted && l.kind != "drop" && !laserNear {
+			// hidden on a roof: only a weapon we badly want is worth coming down for ...
+			comeDown := roofFarm && !earlyRoof && hpFrac > 0.8 && b.o.Self.Cubes < st.wantCubes &&
+				!b.mechSeenWithin(6) && b.t-b.lastWeaponDT > 8 && (l.id == b.lootID || dist2(b.pos, l.pos) < 120)
+			if !comeDown {
+				l = nil
+			}
 		}
 		if l != nil {
 			b.mode = "loot:" + l.kind
@@ -852,7 +866,7 @@ func (b *Bot) think(act *proto.Action) {
 					rq.wantW = 0
 					rq.hold = true
 				}
-			} else if rx, ry, ok := b.roamTarget(st, hpFrac); ok && !roofFirst && (!roofWanted || (!b.armed() && quiet)) {
+			} else if rx, ry, ok := b.roamTarget(st, hpFrac); ok && !roofFirst && !earlyRoof && (!roofWanted || (!b.armed() && quiet)) {
 				// nothing known to pick up: go and look for crates and weapons
 				b.mode = "roam"
 				setGoal(rx, ry, 1.5, false)
