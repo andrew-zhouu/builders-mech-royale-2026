@@ -114,7 +114,8 @@ func Variants() map[string]func(p *Params) {
 		"b-jitj":  func(p *Params) { p.StrafeMin, p.StrafeMax = 0.25, 0.55; p.Jink = 0.6 },
 		// v0.7 and v0.7.1 exactly as published
 		"v07":  func(p *Params) { v07(p) },
-		"v071": func(p *Params) { p.EdgeHold = 0 },
+		"v071": func(p *Params) { p.EdgeHold = 0; p.NoMortar = false },
+		"v072": func(p *Params) { p.NoMortar = false },
 		// the rules read off the real first-contact data: cover unless laser-against-none; hunt only then
 		"b-real":    func(p *Params) { p.CoverFirst = true; p.HuntLaserEdge = true },
 		"b-realh":   func(p *Params) { p.CoverFirst = true; p.HuntLaserEdge = true; p.HuntRangeLaser = 200 },
@@ -229,6 +230,8 @@ func v061(p *Params) {
 	p.CoverFirst = false
 	p.HuntLaserEdge = false
 	p.LootHiddenBias = 0
+	p.EdgeHold = 0
+	p.NoMortar = false
 	oldLead(p)
 }
 
@@ -237,6 +240,8 @@ func v07(p *Params) {
 	p.CoverFirst = false
 	p.HuntLaserEdge = false
 	p.LootHiddenBias = 0
+	p.EdgeHold = 0
+	p.NoMortar = false
 }
 
 // brawl2 is the armed-farmer parameter set (the defaults since v0.6): the published practice behaviour
