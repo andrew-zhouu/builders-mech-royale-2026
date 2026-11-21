@@ -79,6 +79,9 @@ type Params struct {
 	AvoidAdv        float64 // attacked from beyond AvoidRange with less advantage than this: slip behind cover, shooting back (0 = always stand and fight)
 	AvoidRange      float64
 	AvoidCover      float64 // ... if cover is within this path length
+	PathFix         bool    // a goal is only called unreachable after a path search for that very goal failed
+	LootBoost       float64 // sprint to a laser on the ground while energy is above this (0 = walk)
+	NoMortar        bool    // do not pick up mortars (holding one adds 60% to every laser hit we take)
 	ProvokeRule     bool    // being looked at from beyond AvoidRange is not an attack: hold fire until touched
 	PlinkMaxDPS     float64 // under lighter fire than this from range (no laser on us), keep farming and shoot back in between (0 = off)
 	HuntRange       float64 // start a fight with a favourable target inside this range
@@ -143,6 +146,7 @@ func DefaultParams() Params {
 		BrawlWantCubes:    15,
 		AvoidRange:        85,
 		AvoidCover:        55,
+		PathFix:           true,
 		ProvokeRule:       false, // both rules below are experiments (variants b-prov, b-plink): not better in the re-enactment yet
 		PlinkMaxDPS:       0,
 		HuntRange:         130,
@@ -277,6 +281,7 @@ type Bot struct {
 	// movement state
 	path       []int32
 	pathBad    bool // the last search failed or stopped short of the goal
+	pathSet    bool // a search has been made (pathGoal and pathT mean something)
 	pathGoal   [2]float64
 	pathT      float64
 	pathIdx    int

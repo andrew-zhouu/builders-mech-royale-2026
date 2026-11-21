@@ -96,6 +96,12 @@ func Variants() map[string]func(p *Params) {
 		"b-d35":    func(p *Params) { brawl2(p); p.DuelDisengage = 0.35 },
 		"b-d75":    func(p *Params) { brawl2(p); p.DuelDisengage = 0.75 },
 		"b-oldhit": func(p *Params) { brawl2(p); p.HitModel = 0 },
+		// v0.6 exactly as published (with the first-goal path bug)
+		"v06":       func(p *Params) { brawl2(p); p.PathFix = false },
+		// experiments on top of the v0.6 brawl: sprint to lasers; leave mortars alone
+		"b-sprint":   func(p *Params) { brawl2(p); p.LootBoost = 30 },
+		"b-sprint10": func(p *Params) { brawl2(p); p.LootBoost = 30; p.LaserValue = 10; p.ArmSwapMin = 0.5 },
+		"b-nomortar": func(p *Params) { brawl2(p); p.NoMortar = true },
 		// experiments on top of the v0.6 brawl: hold fire until touched; keep farming under light fire
 		"b-prov":      func(p *Params) { brawl2(p); p.ProvokeRule = true },
 		"b-plink":     func(p *Params) { brawl2(p); p.PlinkMaxDPS = 60 },

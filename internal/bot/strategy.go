@@ -270,6 +270,9 @@ func (b *Bot) wantPickup(kind string) (bool, int) {
 	if b.has(kind) >= 0 {
 		return false, -1
 	}
+	if kind == "mortar" && b.P.NoMortar && b.realModel() {
+		return false, -1
+	}
 	for i := 0; i < 2; i++ {
 		if !b.slots[i].ok {
 			return true, -1

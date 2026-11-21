@@ -312,7 +312,9 @@ func (b *Bot) navDir(gx, gy float64) (float64, float64, float64, bool) {
 		dx, dy := norm2(gx-b.pos[0], gy-b.pos[1])
 		return dx, dy, d, true
 	}
-	replan := len(b.path) == 0 || hyp(gx-b.pathGoal[0], gy-b.pathGoal[1]) > 5 || b.t-b.pathT > 1.6
+	// the path we hold is for somewhere else (or there is none yet)
+	other := !b.pathSet || hyp(gx-b.pathGoal[0], gy-b.pathGoal[1]) > 5
+	replan := len(b.path) == 0 || other || b.t-b.pathT > 1.6
 	if !replan && b.pathIdx < len(b.path) {
 		px, py := b.Nav.Pos(int(b.path[b.pathIdx]))
 		if hyp(px-b.pos[0], py-b.pos[1]) > 12 {
@@ -320,15 +322,28 @@ func (b *Bot) navDir(gx, gy float64) (float64, float64, float64, bool) {
 		}
 	}
 	// path searches are the most expensive thing we do: never more than about three a second, and
-	// a search that failed or fell short is not repeated for a second
+	// a search that failed or fell short is not repeated for a second. A new goal may search sooner
+	// (but not every decision, in case two goals alternate).
 	gap := 0.35
 	if b.pathBad {
 		gap = 1.0
 	}
-	if replan && b.t-b.pathT < gap {
+	if other && b.P.PathFix {
+		gap = 0.15
+	}
+	if replan && (b.pathSet || !b.P.PathFix) && b.t-b.pathT < gap {
 		replan = false
 	}
+	if other && !replan && b.P.PathFix {
+		// No search allowed for this goal yet: head straight for it for a moment. It must not be
+		// reported as unreachable on the strength of a path (or a failure) that was for another place:
+		// the caller would cross it off for 40 seconds, and at the first tick of a match that used to
+		// cost us the best weapon near our spawn.
+		dx, dy := norm2(gx-b.pos[0], gy-b.pos[1])
+		return dx, dy, d, true
+	}
 	if replan {
+		b.pathSet = true
 		b.path = b.Nav.Path(b.pos[0], b.pos[1], gx, gy, r, h, 9000, b.navCost())
 		b.pathGoal = [2]float64{gx, gy}
 		b.pathT = b.t
