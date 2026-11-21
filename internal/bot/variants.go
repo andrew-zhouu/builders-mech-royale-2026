@@ -112,8 +112,9 @@ func Variants() map[string]func(p *Params) {
 		"b-jit":   func(p *Params) { p.StrafeMin, p.StrafeMax = 0.25, 0.55 },
 		"b-jit2":  func(p *Params) { p.StrafeMin, p.StrafeMax = 0.2, 0.42 },
 		"b-jitj":  func(p *Params) { p.StrafeMin, p.StrafeMax = 0.25, 0.55; p.Jink = 0.6 },
-		// v0.7 exactly as published
-		"v07": func(p *Params) { v07(p) },
+		// v0.7 and v0.7.1 exactly as published
+		"v07":  func(p *Params) { v07(p) },
+		"v071": func(p *Params) { p.EdgeHold = 0 },
 		// the rules read off the real first-contact data: cover unless laser-against-none; hunt only then
 		"b-real":    func(p *Params) { p.CoverFirst = true; p.HuntLaserEdge = true },
 		"b-realh":   func(p *Params) { p.CoverFirst = true; p.HuntLaserEdge = true; p.HuntRangeLaser = 200 },
