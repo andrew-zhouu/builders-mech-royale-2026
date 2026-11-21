@@ -178,6 +178,7 @@ func DefaultParams() Params {
 		AvoidCover:        55,
 		ZoneSlack:         10,
 		CoverFirst:        true,
+		NoMortar:          true, // a laser hit on a mortar carrier does 60% more (seen: 1,024 health gone in 0.7 s)
 		EdgeHold:          2.5,
 		HuntLaserEdge:     true,
 		LootHiddenBias:    0.5,
