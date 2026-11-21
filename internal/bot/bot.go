@@ -79,7 +79,26 @@ type Params struct {
 	AvoidAdv        float64 // attacked from beyond AvoidRange with less advantage than this: slip behind cover, shooting back (0 = always stand and fight)
 	AvoidRange      float64
 	AvoidCover      float64 // ... if cover is within this path length
+	RoofCoverHold   float64 // brawl stance: stay behind the roof edge this long after the last watcher (0 = step back out at once)
+	RoofStandCheck  bool    // stay on a roof only if the spot we would stand at is inside the next circle
+	DropStick       bool    // supply drops: stay on one once chosen; skip them when at the cube cap and healthy (brawl stance)
+	ClimbClearRange float64 // brawl stance: no climb while any mech is in plain sight inside this range
+	RoofCenterW     float64 // roof choice: penalty per metre from the middle of the next circle (0 = off)
+	RoofLeaveQuiet  float64 // leave a doomed roof only when unwatched, until the zone edge is this many seconds away (0 = leave at once)
+	ZoneSlack       float64 // loot must stay inside the zone this long after we would reach it (0 = the old rule)
+	BrawlRoofs      bool    // brawl stance, free-for-all known: wait on a roof once armed for it
+	BrawlRoofCubes  int     // ... which means a laser, or this many cubes,
+	BrawlRoofAfter  float64 // ... or this much match time
+	Jink            float64 // zig-zag (sideways share of the heading) while walking somewhere under gun fire from range (0 = off)
+	LeadPersist     bool    // scale the gun lead by how straight the target has been moving (jitterers get none)
+	LeadCum         bool    // per opponent, aim the way (lead / no lead) that has been missing by less while it fights us
+	LeadCumMin      float64 // ... once this many virtual shots have been scored
+	LaserPreempt    bool    // a laser carrier looking at us counts as an attack already (take cover before the first beam)
+	AvoidCoverLaser float64 // path length we accept to cover when the attacker holds a laser
+	HoldHideMap     bool    // brawl stance: with nothing to do, wait at a ground hideout from the visibility map
+	LaserAimRange   float64 // a laser carrier looking at us counts as on us out to this range (others: 200 m)
 	PathFix         bool    // a goal is only called unreachable after a path search for that very goal failed
+	CreditFix       bool    // a death is not credited to our own shooting while our target is in plain sight alive
 	LootBoost       float64 // sprint to a laser on the ground while energy is above this (0 = walk)
 	NoMortar        bool    // do not pick up mortars (holding one adds 60% to every laser hit we take)
 	ProvokeRule     bool    // being looked at from beyond AvoidRange is not an attack: hold fire until touched
@@ -99,7 +118,7 @@ func DefaultParams() Params {
 		DisengageRat:  0.75,
 		RetreatHP:     0.45,
 		ReturnHP:      0.85,
-		LeadDamp:      0.75,
+		LeadDamp:      0.65,
 		GunMaxRange:   224,
 		StrafeMin:     0.35,
 		StrafeMax:     1.1,
@@ -143,12 +162,29 @@ func DefaultParams() Params {
 		BrawlDisengage:    0.75,
 		BrawlHunt:         true,
 		BrawlLootRadius:   220,
-		BrawlWantCubes:    15,
+		BrawlWantCubes:    10, // stats stop growing at 10 cubes; size (and so how easy we are to hit) does not
 		AvoidRange:        85,
 		AvoidCover:        55,
+		ZoneSlack:         10,
+		RoofCoverHold:     6,
+		RoofStandCheck:    true,
+		DropStick:         true,
+		RoofLeaveQuiet:    25,
+		ClimbClearRange:   150,
+		BrawlRoofs:        true,
+		LaserPreempt:      true,
+		LaserAimRange:     285,
+		AvoidCoverLaser:   90,
+		BrawlRoofCubes:    6,
+		BrawlRoofAfter:    60,
+		LeadPersist:       true,
+		LeadCum:           true,
+		LeadCumMin:        8,
 		PathFix:           true,
-		ProvokeRule:       false, // both rules below are experiments (variants b-prov, b-plink): not better in the re-enactment yet
-		PlinkMaxDPS:       0,
+		CreditFix:         true,
+		LootBoost:         30,
+		ProvokeRule:       true,
+		PlinkMaxDPS:       60,
 		HuntRange:         130,
 		HuntRangeLaser:    130,
 		KiteMin:        130,
@@ -186,6 +222,20 @@ type Track struct {
 	WasListed bool   // listed in the previous observation
 	ViewT    float64 // last time it was inside our own field of view (not just remembered)
 	EngT     float64 // last time it counted as engaged with us
+
+	// recent motion, for choosing how to lead it (see lead.go)
+	hist            [trkHist]trkSample
+	hn, hi          int     // samples held, index of the next write
+	leadN           float64 // (decayed) number of virtual shots scored
+	missNone        float64 // (decayed) sum of what aiming at where it stood would have missed by
+	missLead        float64 // ... and what leading it would have missed by
+}
+
+const trkHist = 40 // four seconds at ten observations a second
+
+type trkSample struct {
+	t, x, y, vx, vy float64
+	facing          bool // its torso pointed at us
 }
 
 func (t *Track) scale(sizePerCube float64) float64 { return 1 + sizePerCube*float64(t.Cubes) }
@@ -353,6 +403,11 @@ type Bot struct {
 	roofCoverC  int
 	roofCoverT  float64
 	unquietT    float64  // last time someone was near or watching
+	roofCoverHoldT float64 // last time something made us duck behind the roof edge
+	holdClimb   bool     // do not start jetting up a wall right now (someone is watching or shooting)
+	holdRoofMove bool    // do not leave the roof we are on right now (same reason; the zone is not close yet)
+	jinkSign    float64  // which side the current zig of a zig-zag goes
+	jinkT       float64  // when it flips next
 	slipCell    int      // cover we are slipping to (brawl stance)
 	slipT       float64  // when it was last looked for
 	slipOnT     float64  // last time we decided to slip
@@ -371,6 +426,7 @@ type Bot struct {
 	climbs        int
 	prevRoofState int
 	creditT     float64 // last time we damaged a mech (deaths right after count as ours)
+	creditID    int     // ... and which one
 
 	scratch []cand
 }
@@ -419,7 +475,9 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	b.hideOutT = -100
 	b.unquietT = -100
 	b.slipCell, b.slipT, b.slipOnT = -1, -100, -100
-	if p.UseHideMap {
+	b.jinkSign, b.jinkT = 1, -100
+	b.roofCoverHoldT = -100
+	if p.UseHideMap || p.HoldHideMap {
 		b.hm = getHideMap(nav)
 	}
 	b.roofFirstOK = true
@@ -717,8 +775,12 @@ func (b *Bot) observe(o *proto.Obs) {
 			bear := math.Atan2(b.pos[1]-m.Pos[1], b.pos[0]-m.Pos[0])
 			d := dist2(b.pos, m.Pos)
 			tol := 0.12 + math.Atan2(b.radius*1.5, math.Max(d, 1))
-			if math.Abs(angDiff(m.Aim[0], bear)) < tol {
+			off := math.Abs(angDiff(m.Aim[0], bear))
+			if off < tol {
 				tr.AimAtMeT = b.t
+			}
+			if b.P.LeadPersist || b.P.LeadCum {
+				b.leadRecord(tr, off < 0.35)
 			}
 		}
 	}
@@ -809,6 +871,7 @@ func (b *Bot) observe(o *proto.Obs) {
 			b.lastDealtT = b.t
 			if e.Target < 100 {
 				b.creditT = b.t
+				b.creditID = e.Target
 				if Stats {
 					b.hitLog = append(b.hitLog, hitRec{b.t, e.Amount})
 				}

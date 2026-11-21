@@ -96,8 +96,53 @@ func Variants() map[string]func(p *Params) {
 		"b-d35":    func(p *Params) { brawl2(p); p.DuelDisengage = 0.35 },
 		"b-d75":    func(p *Params) { brawl2(p); p.DuelDisengage = 0.75 },
 		"b-oldhit": func(p *Params) { brawl2(p); p.HitModel = 0 },
-		// v0.6 exactly as published (with the first-goal path bug)
-		"v06":       func(p *Params) { brawl2(p); p.PathFix = false },
+		// how long we assume a free-for-all before settling on the squad stance (999: brawl always)
+		"b-open45":  func(p *Params) { p.OpenSecs = 45 },
+		"b-open90":  func(p *Params) { p.OpenSecs = 90 },
+		"b-open999": func(p *Params) { p.OpenSecs = 9999 },
+		// gun lead: half lead at long flight times; scaled by persistence; learned per opponent
+		"b-oldlead": func(p *Params) { oldLead(p) },
+		"b-damp5":   func(p *Params) { oldLead(p); p.LeadDamp = 0.5 },
+		"b-pers":    func(p *Params) { oldLead(p); p.LeadDamp = 0.5; p.LeadPersist = true },
+		"b-cum":     func(p *Params) { oldLead(p); p.LeadDamp = 0.5; p.LeadCum = true },
+		"b-perscum": func(p *Params) { oldLead(p); p.LeadDamp = 0.5; p.LeadPersist = true; p.LeadCum = true },
+		"b-pc75":    func(p *Params) { p.LeadDamp = 0.75 },
+		"b-pc100":   func(p *Params) { p.LeadDamp = 1.0 },
+		// faster strafe reversals in a fight (the real jitterers reverse every 0.3-0.6 s)
+		"b-jit":   func(p *Params) { p.StrafeMin, p.StrafeMax = 0.25, 0.55 },
+		"b-jit2":  func(p *Params) { p.StrafeMin, p.StrafeMax = 0.2, 0.42 },
+		"b-jitj":  func(p *Params) { p.StrafeMin, p.StrafeMax = 0.25, 0.55; p.Jink = 0.6 },
+		"b-noslack": func(p *Params) { p.ZoneSlack = 0 },
+		"b-rc3":     func(p *Params) { p.RoofCenterW = 0.3 },
+		"b-rc6":     func(p *Params) { p.RoofCenterW = 0.6 },
+		"b-rlq":     func(p *Params) { p.RoofLeaveQuiet = 25 },
+		"b-rc3lq":   func(p *Params) { p.RoofCenterW = 0.3; p.RoofLeaveQuiet = 25 },
+		"b-noroof":  func(p *Params) { p.BrawlRoofs = false },
+		"b-nopre":   func(p *Params) { p.LaserPreempt = false; p.LaserAimRange = 0; p.AvoidCoverLaser = 0 },
+		"b-c15":     func(p *Params) { p.BrawlWantCubes = 15 },
+		// brawl opening, then wait on a roof (the published v0.5 was safe on roofs in its real matches)
+		"b-roof":    func(p *Params) { p.BrawlRoofs = true },
+		"b-roofpre": func(p *Params) { p.BrawlRoofs = true; p.LaserPreempt = true; p.LaserAimRange = 285 },
+		"b-roof3":   func(p *Params) { p.BrawlRoofs = true; p.BrawlRoofCubes = 3; p.BrawlRoofAfter = 40 },
+		"b-roof10":  func(p *Params) { p.BrawlRoofs = true; p.BrawlRoofCubes = 10; p.BrawlRoofAfter = 100 },
+		// zig-zag while walking under fire
+		"b-jink5": func(p *Params) { p.Jink = 0.5 },
+		"b-jink8": func(p *Params) { p.Jink = 0.8 },
+		// candidates for v0.7
+		"b-hm":     func(p *Params) { p.HoldHideMap = true },
+		"b-las285": func(p *Params) { p.LaserAimRange = 285 },
+		"b-hm285":  func(p *Params) { p.HoldHideMap = true; p.LaserAimRange = 285 },
+		"b-pre":    func(p *Params) { p.LaserPreempt = true; p.LaserAimRange = 285 },
+		"b-pre90":  func(p *Params) { p.LaserPreempt = true; p.LaserAimRange = 285; p.AvoidCoverLaser = 90 },
+		"b-cov90l": func(p *Params) { p.AvoidCoverLaser = 90 },
+		// ablations of the newest rules
+		"b-noprov2":  func(p *Params) { p.ProvokeRule = false },
+		"b-noplink2": func(p *Params) { p.PlinkMaxDPS = 0 },
+		"b-nosprint": func(p *Params) { p.LootBoost = 0 },
+		"b-nocredit": func(p *Params) { p.CreditFix = false },
+		// v0.6 exactly as published (with the first-goal path bug), and v0.6.1 (bug fixed)
+		"v06":  func(p *Params) { v061(p); p.PathFix = false },
+		"v061": func(p *Params) { v061(p) },
 		// experiments on top of the v0.6 brawl: sprint to lasers; leave mortars alone
 		"b-sprint":   func(p *Params) { brawl2(p); p.LootBoost = 30 },
 		"b-sprint10": func(p *Params) { brawl2(p); p.LootBoost = 30; p.LaserValue = 10; p.ArmSwapMin = 0.5 },
@@ -106,6 +151,9 @@ func Variants() map[string]func(p *Params) {
 		"b-prov":      func(p *Params) { brawl2(p); p.ProvokeRule = true },
 		"b-plink":     func(p *Params) { brawl2(p); p.PlinkMaxDPS = 60 },
 		"b-provplink": func(p *Params) { brawl2(p); p.ProvokeRule = true; p.PlinkMaxDPS = 60 },
+		"b-pps":       func(p *Params) { brawl2(p); p.ProvokeRule = true; p.PlinkMaxDPS = 60; p.LootBoost = 30 },
+		"b-pp40":      func(p *Params) { brawl2(p); p.ProvokeRule = true; p.PlinkMaxDPS = 40 },
+		"b-pp90":      func(p *Params) { brawl2(p); p.ProvokeRule = true; p.PlinkMaxDPS = 90 },
 	}
 }
 
@@ -119,10 +167,45 @@ func v05(p *Params) {
 	p.AvoidAdv = 0
 	p.UseHideMap = false
 	p.QuietHoldS = 0
+	p.PathFix = false
+	p.CreditFix = false
+	p.LootBoost = 0
+	p.ProvokeRule = false
+	p.PlinkMaxDPS = 0
+	p.ZoneSlack = 0
+	p.DropStick = false
+	p.RoofLeaveQuiet = 0
+	p.RoofStandCheck = false
+	oldLead(p)
 }
 
-// brawl2 keeps the published practice behaviour (squad stance after the opening) and replaces the
-// stealth stances with the armed-farmer one.
+// oldLead is the gun lead of every build up to v0.6.1: instantaneous velocity, damped to 75%.
+func oldLead(p *Params) {
+	p.LeadDamp = 0.75
+	p.LeadPersist = false
+	p.LeadCum = false
+}
+
+// v061 restores the parameters of the published v0.6.1.
+func v061(p *Params) {
+	brawl2(p)
+	p.LootBoost = 0
+	p.ProvokeRule = false
+	p.PlinkMaxDPS = 0
+	p.CreditFix = false
+	p.ZoneSlack = 0
+	p.BrawlWantCubes = 15
+	p.BrawlRoofs = false
+	p.LaserPreempt = false
+	p.LaserAimRange = 0
+	p.AvoidCoverLaser = 0
+	p.RoofLeaveQuiet = 0
+	p.DropStick = false
+	oldLead(p)
+}
+
+// brawl2 is the armed-farmer parameter set (the defaults since v0.6): the published practice behaviour
+// (squad stance after the opening) with the stealth stances replaced.
 func brawl2(p *Params) {
 	p.Brawl = true
 	p.HitModel = 1

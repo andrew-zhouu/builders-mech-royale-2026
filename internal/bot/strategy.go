@@ -133,7 +133,11 @@ func (b *Bot) assess() []threat {
 			th.adv *= math.Pow(clamp(ex, 0.4, 1.8), b.P.ExchangeW)
 		}
 		th.dps = b.theirDPS(tr, d)
-		th.engaged = b.t-tr.HurtMeT < 4 || (tr.LOS && b.t-tr.AimAtMeT < 0.6 && d < 200) || (tr.LOS && d < 40)
+		aimR := 200.0
+		if tr.Laser && b.P.LaserAimRange > aimR && b.realModel() {
+			aimR = b.P.LaserAimRange // a laser reaches 280 m and hits there as well as anywhere
+		}
+		th.engaged = b.t-tr.HurtMeT < 4 || (tr.LOS && b.t-tr.AimAtMeT < 0.6 && d < aimR) || (tr.LOS && d < 40)
 		if !th.engaged && tr.LOS && d < 90 {
 			// walking at us with its torso turned our way: it is about to open up, do not wait for it
 			bear := math.Atan2(b.pos[1]-tr.Pos[1], b.pos[0]-tr.Pos[0])
@@ -348,7 +352,9 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 			}
 		}
 		tt := d*1.25/b.walk + handling
-		if !b.inFutureZone(l.pos[0], l.pos[1], tt+2, 6) {
+		// (with ZoneSlack: the edge must not arrive there for a while after we do, or the zone rule
+		// turns us round the moment we get close and we shuttle between the two)
+		if !b.inFutureZone(l.pos[0], l.pos[1], tt+2+b.P.ZoneSlack, 6) {
 			return
 		}
 		if b.enemyNear(l.pos, 45) && l.kind != "cube" {
@@ -408,7 +414,14 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 		if d > b.P.DropRadius {
 			continue
 		}
-		if dr.LandsIn > d/b.walk*1.3+6 {
+		if dr.LandsIn > d/b.walk*1.3+6 && !(b.P.DropStick && dr.ID == b.lootID) {
+			// (once we are on our way to one we stay on it: the time budget shrinks as we approach,
+			// and without that the "not yet" rule sent us to and fro every other decision)
+			continue
+		}
+		if b.P.DropStick && st.avoid && b.o.Self.Cubes >= st.wantCubes && b.hp > b.maxHP*0.7 {
+			// three more cubes past the stat cap only make us a bigger target: a drop is then worth
+			// it for the repair alone
 			continue
 		}
 		if dr.Holder != nil && *dr.Holder != b.o.Self.ID && st.stealth {
