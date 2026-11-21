@@ -24,6 +24,13 @@ type aimTarget struct {
 	radius   float64
 	centerZ  float64 // height of the aim point above pos
 	mech     bool
+	// lead multiplier (0..1) for projectile solutions; only meaningful when leadSet
+	lead    float64
+	leadSet bool
+	// the multiplier to use for the gun (engage copies it into lead for the gun's solution only:
+	// the laser is instant and keeps the plain latency lead)
+	gunLead    float64
+	gunLeadSet bool
 }
 
 func (b *Bot) targetOf(tr *Track) aimTarget {
@@ -31,7 +38,11 @@ func (b *Bot) targetOf(tr *Track) aimTarget {
 		return aimTarget{pos: tr.Pos, vel: tr.Vel, radius: stat(b.C.Npc, "radius", 1.8), centerZ: stat(b.C.Npc, "height", 3.5) * 0.5}
 	}
 	sc := tr.scale(b.sizePerCube)
-	return aimTarget{pos: tr.Pos, vel: tr.Vel, radius: b.mech("radius", 2.5) * sc, centerZ: 4.5 * sc, mech: true}
+	at := aimTarget{pos: tr.Pos, vel: tr.Vel, radius: b.mech("radius", 2.5) * sc, centerZ: 4.5 * sc, mech: true}
+	if b.P.LeadPersist || b.P.LeadCum {
+		at.gunLead, at.gunLeadSet = b.gunLead(tr), true
+	}
+	return at
 }
 
 func (b *Bot) leadDamp(tf float64) float64 {
@@ -57,10 +68,14 @@ func (b *Bot) solveDirect(tg aimTarget, speed, originH float64) shot {
 	}
 	tf := 0.0
 	var px, py, pz float64
+	k := 1.0
+	if tg.leadSet {
+		k = tg.lead
+	}
 	for it := 0; it < 4; it++ {
 		damp := b.leadDamp(tf)
-		px = tg.pos[0] + tg.vel[0]*(lat+tf*damp)
-		py = tg.pos[1] + tg.vel[1]*(lat+tf*damp)
+		px = tg.pos[0] + tg.vel[0]*(lat+tf*damp)*k
+		py = tg.pos[1] + tg.vel[1]*(lat+tf*damp)*k
 		vz := clamp(tg.vel[2], -15, 12)
 		pz = tg.pos[2] + tg.centerZ + vz*(lat+tf)*0.6
 		if speed <= 0 {
@@ -209,9 +224,15 @@ func (b *Bot) engage(act *proto.Action, tg aimTarget, hasLOS, losRecent bool, hp
 	}
 	pitchTol := tg.centerZ * 0.8
 	if gunI >= 0 {
-		gunS = b.solveDirect(tg, stat(b.slots[gunI].stats, "speed", 252), b.muzzleH)
+		gunTg, gunHead := tg, headTg
+		if tg.gunLeadSet {
+			// the lead learned for this opponent applies to the bullet only
+			gunTg.lead, gunTg.leadSet = tg.gunLead, true
+			gunHead.lead, gunHead.leadSet = tg.gunLead, true
+		}
+		gunS = b.solveDirect(gunTg, stat(b.slots[gunI].stats, "speed", 252), b.muzzleH)
 		if !gunS.clear && headOK {
-			if alt := b.solveDirect(headTg, stat(b.slots[gunI].stats, "speed", 252), b.muzzleH); alt.clear {
+			if alt := b.solveDirect(gunHead, stat(b.slots[gunI].stats, "speed", 252), b.muzzleH); alt.clear {
 				gunS = alt
 				pitchTol = 0.7
 			}

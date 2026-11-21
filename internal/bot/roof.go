@@ -26,6 +26,7 @@ type roofPlan struct {
 	chosen float64 // last time we evaluated roofs
 	tries  int
 	stepT  float64 // last time the roof plan was the thing we were doing
+	waitT0 float64 // since when we have been standing at the wall waiting for watchers to go (0: not waiting)
 	// set by the hideout chooser: the roof to use and the cell on it to stand at (-1: choose by the
 	// older geometric rule)
 	want int
@@ -115,6 +116,12 @@ func (b *Bot) chooseRoof() (int, world.RoofAccess, bool) {
 		}
 		s := ad*1.2 - math.Min(r.InnerD, 25)*2.5 - math.Min(r.Height, 30)*1.5
 		ix, iy := b.Nav.Pos(r.Inner)
+		if b.P.RoofCenterW > 0 {
+			// a roof nearer the middle of the next circle is likelier to survive the shrink after it:
+			// every move between roofs is a walk in the open, and that is where the roof-sitter died
+			z := &b.o.Zone
+			s += hyp(ix-z.NextCenter[0], iy-z.NextCenter[1]) * b.P.RoofCenterW
+		}
 		for _, tr := range b.tracks {
 			if tr.NPC || b.t-tr.LastSeen > 20 {
 				continue
@@ -403,7 +410,15 @@ func (b *Bot) roofWanted(st stance, zi zoneInfo) bool {
 		return false
 	}
 	if !st.stealth && !b.P.RoofInSquad {
-		return false
+		// the brawl stance in a known free-for-all: once armed for it (a laser, or some cubes, or
+		// simply later in the match) wait on a roof instead of on the ground. In the real matches our
+		// mech took 9 damage a second on roofs against 32 anywhere else.
+		if !(b.P.BrawlRoofs && st.avoid && st.name == "ffa") {
+			return false
+		}
+		if b.has("laser") < 0 && b.o.Self.Cubes < b.P.BrawlRoofCubes && b.t < b.P.BrawlRoofAfter {
+			return false
+		}
 	}
 	return true
 }
@@ -420,9 +435,12 @@ func (b *Bot) roofPlanStep(wanted bool, act *proto.Action) (gx, gy float64, sett
 // hideoutFor is the policy's entry to the hideout chooser: stealth stances only, and it leaves the
 // roof plan pointed at the chosen roof (or free to choose by the older rule when the map is not used).
 func (b *Bot) hideoutFor(st stance, zi zoneInfo, allowRoof bool) (hideout, bool) {
-	if b.hm == nil || !st.stealth {
+	if b.hm == nil || !(st.stealth || (b.P.HoldHideMap && st.avoid)) {
 		b.roof.want, b.roof.spot = -1, -1
 		return hideout{}, false
+	}
+	if !st.stealth {
+		allowRoof = false // the brawl stance waits on the ground
 	}
 	ho, ok := b.hideoutStep(zi, allowRoof)
 	if !ok {
@@ -476,6 +494,22 @@ func (b *Bot) roofHold(act *proto.Action) (gx, gy float64, settled, ok bool) {
 			// the hideout chooser decides which roof: stay only if this is the one it wants
 			stay = id == b.roof.want && b.roofSpotOK(r)
 		}
+		if stay && b.P.RoofStandCheck {
+			// the place we would actually stand at (not just the roof's deepest cell) must be inside
+			// the next circle, or the zone rule and this one pull us to and fro along the roof
+			z := &b.o.Zone
+			sx, sy := b.roofSpot(id)
+			if hyp(sx-z.NextCenter[0], sy-z.NextCenter[1]) > z.NextRadius-4 {
+				stay = false
+				if b.roof.ban == nil {
+					b.roof.ban = map[int]float64{}
+				}
+				b.roof.ban[id] = b.t + 60
+			}
+		}
+		if !stay && b.holdRoofMove {
+			stay = true // someone is watching and the zone is not here yet: do not climb down in front of them
+		}
 		if stay {
 			b.roof.state, b.roof.id = roofOn, id
 			x, y := b.roofSpot(id)
@@ -502,6 +536,24 @@ func (b *Bot) roofHold(act *proto.Action) (gx, gy float64, settled, ok bool) {
 	d := hyp(gx-b.pos[0], gy-b.pos[1])
 	if d < 1.6 && b.onGroundLevel() {
 		need := b.roof.acc.Climb/8.9*stat(b.o.Self.Stats, "jet_drain", 15) + 24
+		if b.holdClimb {
+			// somebody is about: no jetting up a wall in front of them. If that lasts, this roof is
+			// the wrong one for now (the ground rules take over until another is chosen).
+			if b.roof.waitT0 <= 0 {
+				b.roof.waitT0 = b.t
+			}
+			if b.t-b.roof.waitT0 > 4 {
+				if b.roof.ban == nil {
+					b.roof.ban = map[int]float64{}
+				}
+				b.roof.ban[b.roof.id] = b.t + 20
+				b.roof.state = roofNone
+				b.roof.waitT0 = 0
+				return 0, 0, false, false
+			}
+			return gx, gy, true, true
+		}
+		b.roof.waitT0 = 0
 		if b.energy >= need {
 			b.roof.state = roofClimb
 			b.roof.t0 = b.t

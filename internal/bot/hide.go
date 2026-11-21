@@ -47,7 +47,18 @@ func (b *Bot) belief() stance {
 			n -= b.kills - b.killsSeen
 			b.killsSeen = b.kills
 		} else if b.t-b.creditT < 6 {
-			n--
+			// we were shooting someone: the death may be that one finished off by something else.
+			// Not if we can see that one alive this very moment (then somebody else died, and a
+			// fight of our own must not keep hiding a free-for-all from us).
+			mine := true
+			if b.P.CreditFix {
+				if tr := b.tracks[b.creditID]; tr != nil && tr.Listed && tr.HP > 0 {
+					mine = false
+				}
+			}
+			if mine {
+				n--
+			}
 		}
 		if n > 0 {
 			b.unexplained += n

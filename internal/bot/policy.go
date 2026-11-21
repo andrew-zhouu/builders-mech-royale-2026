@@ -172,6 +172,9 @@ func (b *Bot) think(act *proto.Action) {
 	slip := false       // attacked from range without an edge: go behind cover, shooting back
 	plink := false      // lightly attacked from range: keep farming and shoot back in between
 	unprovoked := false // watched from range by someone who has not touched us: do not start it
+	roofDuck := false   // on our roof and attacked without an edge: step back behind the roof's edge
+	onRoof := b.onRoof() >= 0 && b.o.Self.Grounded
+	roofWanted := b.roofWanted(st, zi)
 	huntR := b.P.HuntRange
 	if b.has("laser") >= 0 && b.P.HuntRangeLaser > huntR {
 		huntR = b.P.HuntRangeLaser
@@ -192,13 +195,20 @@ func (b *Bot) think(act *proto.Action) {
 				// Free-for-all: an exchange at range without an edge is a coin flip that leaves even
 				// the winner weak, and being looked at is not being attacked.
 				provoked := !b.P.ProvokeRule || b.t-tgt.tr.HurtMeT < 4 || tgt.d < b.P.AvoidRange ||
-					(tgt.tr.Laser && tgt.tr.Charging && b.t-tgt.tr.AimAtMeT < 0.4)
+					(tgt.tr.Laser && tgt.tr.Charging && b.t-tgt.tr.AimAtMeT < 0.4) ||
+					// a laser pointed our way is a third of our health about to go: do not wait for it
+					(b.P.LaserPreempt && tgt.tr.Laser && tgt.tr.LOS && b.t-tgt.tr.AimAtMeT < 0.6)
 				far := tgt.d >= b.P.AvoidRange && tgt.adv < b.P.AvoidAdv
 				// heavy fire (a laser, or a gun that is actually landing) needs cover; light fire does not
 				heavy := tgt.tr.Laser || b.recentDmg/3.0 > b.P.PlinkMaxDPS || hpFrac < 0.5 || nEngaged >= 2
 				switch {
 				case !provoked:
 					unprovoked = true // carry on; the torso keeps an eye on it, guns quiet
+				case onRoof && roofWanted && !b.enemyOnRoof(ths):
+					// up here we do what the published bot did in its real matches (9 damage a second
+					// on roofs against 32 elsewhere): out of sight behind the edge, shooting back on
+					// the way (falls back to fighting from the roof if it has no hidden spot)
+					roofDuck = true
 				case far && heavy && b.slipFrom(tgt, ths):
 					slip = true
 				case far && !heavy && b.P.PlinkMaxDPS > 0:
@@ -292,10 +302,31 @@ func (b *Bot) think(act *proto.Action) {
 	}
 	holdFire := false
 	direct := false // the action's movement was written directly (jet climb): skip the ground planner
-	onRoof := b.onRoof() >= 0 && b.o.Self.Grounded
-	roofWanted := b.roofWanted(st, zi)
+	// jetting up a wall in someone's sights is how we died in our first real match
+	b.holdClimb = st.avoid && (len(watchers) > 0 || underFire)
+	if st.avoid && !b.holdClimb {
+		// ... nor with anyone in plain sight inside 150 m, whichever way it happens to be looking
+		for i := range ths {
+			if ths[i].tr.Listed && ths[i].tr.LOS && ths[i].d < b.P.ClimbClearRange {
+				b.holdClimb = true
+				break
+			}
+		}
+	}
+	// ... and climbing down from a roof under someone's eyes is how it died later on: leave a roof
+	// that the zone will take only once nobody is looking, or when the edge is nearly here
+	b.holdRoofMove = b.P.RoofLeaveQuiet > 0 && st.avoid && onRoof && (len(watchers) > 0 || underFire) && zi.tPass > b.P.RoofLeaveQuiet && !zi.urgent
 	roofCoverCell := -1
-	if onRoof && roofWanted && st.stealth && (b.retreating || wantFight || len(watchers) > 0 || underFire) && !b.enemyOnRoof(ths) {
+	wantRoofCover := st.stealth && (b.retreating || wantFight || len(watchers) > 0 || underFire)
+	if st.avoid && (roofDuck || b.retreating || len(watchers) > 0 || underFire) {
+		wantRoofCover = true
+		b.roofCoverHoldT = b.t
+	} else if st.avoid && b.t-b.roofCoverHoldT < b.P.RoofCoverHold {
+		// stay ducked for a few seconds after the last pair of eyes: stepping back out the moment a
+		// watcher turns its head had us walking to and fro along the roof
+		wantRoofCover = true
+	}
+	if onRoof && roofWanted && wantRoofCover && !b.enemyOnRoof(ths) {
 		if b.t-b.roofCoverT > 0.4 {
 			b.roofCoverC = b.roofCover(b.onRoof(), ths)
 			b.roofCoverT = b.t
@@ -304,6 +335,9 @@ func (b *Bot) think(act *proto.Action) {
 	} else {
 		b.roofCoverC = -1
 		b.roofCoverT = -100
+	}
+	if roofDuck && roofCoverCell < 0 && !b.retreating {
+		wantFight = true // nowhere to duck up here: have it out from the roof
 	}
 	// opening option: get onto a roof before anything else (weapons come later, when it is quiet)
 	if b.roofFirstOK && !b.roofFirstChecked && b.P.RoofFirstSecs > 0 && roofWanted {
@@ -327,6 +361,11 @@ func (b *Bot) think(act *proto.Action) {
 		// (a fight at range does not stop us walking: the torso keeps shooting on the way)
 		b.mode = "zone"
 		b.roof.state = roofNone
+		if b.P.ZoneSlack > 0 && b.lootID >= 0 {
+			// the loot we were walking to is where the zone is about to be: forget it for a while
+			b.banUntil[b.lootID] = b.t + 20
+			b.lootID = -1
+		}
 		setGoal(zi.goal[0], zi.goal[1], 3.0, zi.critical && b.energy > 15)
 		rq.zoneFree = true
 		if !zi.walkable {
@@ -589,6 +628,28 @@ func (b *Bot) think(act *proto.Action) {
 			direct = true
 		}
 	}
+	// Walking somewhere under gun fire from range: zig-zag. Every opponent leads with our velocity of
+	// the moment, and in the real matches a mech walking a straight line away was hit half the time
+	// at 120-180 m against under a third when it kept changing direction.
+	if b.P.Jink > 0 && !direct && navigating && !rq.hold && !rq.fenceRoof && underFire && (rq.wantX != 0 || rq.wantY != 0) {
+		far := false
+		for i := range ths {
+			if ths[i].engaged && !ths[i].phantom && ths[i].d > 55 && b.t-ths[i].tr.HurtMeT < 3 {
+				far = true
+			}
+		}
+		gd := hyp(lastGoal[0]-b.pos[0], lastGoal[1]-b.pos[1])
+		if far && gd > 12 {
+			if b.t >= b.jinkT {
+				if b.rng.Float64() < 0.85 {
+					b.jinkSign = -b.jinkSign
+				}
+				b.jinkT = b.t + 0.3 + b.rng.Float64()*0.4
+			}
+			px, py := -rq.wantY, rq.wantX
+			rq.wantX, rq.wantY = norm2(rq.wantX+px*b.P.Jink*b.jinkSign, rq.wantY+py*b.P.Jink*b.jinkSign)
+		}
+	}
 	if !direct {
 		b.steer(act, rq)
 		b.unstick(act, navigating && !rq.hold && !rq.fenceRoof)
@@ -725,7 +786,11 @@ func (b *Bot) slipFrom(tgt *threat, ths []threat) bool {
 		return false
 	}
 	if b.t-b.slipT > 0.5 {
-		b.slipCell = b.findCover(ths, b.P.AvoidCover)
+		reach := b.P.AvoidCover
+		if tgt.tr.Laser && b.P.AvoidCoverLaser > reach {
+			reach = b.P.AvoidCoverLaser // against a laser, cover is worth a longer run
+		}
+		b.slipCell = b.findCover(ths, reach)
 		b.slipT = b.t
 	}
 	if b.slipCell < 0 {
