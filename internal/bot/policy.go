@@ -42,6 +42,25 @@ func (b *Bot) think(act *proto.Action) {
 		b.P = b.pBase
 		st = b.belief()
 	}
+	if b.squadOn && b.ffa {
+		// (it was a free-for-all after all)
+		b.squadOn = false
+		b.P = b.pPre
+		st = b.belief()
+	}
+	if !b.squadOn && b.P.SquadSet != "" && !b.ffa && !b.openPhase() && !b.openSetOn {
+		// Taken to be practice: the parameter set kept for the house squad. A real free-for-all is
+		// known within 30 s in every match we have recorded, so this touches practice only.
+		if f := Variants()[b.P.SquadSet]; f != nil {
+			b.pPre = b.P
+			q := b.P
+			f(&q)
+			q.SquadSet, q.FFASwap, q.Salt = b.P.SquadSet, b.P.FFASwap, b.P.Salt
+			b.P = q
+			b.squadOn = true
+			st = b.belief()
+		}
+	}
 	if b.ffa && !b.swapped && b.P.FFASwap != "" {
 		// A free-for-all for certain: change to the parameter set named in FFASwap for the rest of the
 		// match. Practice never gets here, so whatever the build scores in practice stays as it is.

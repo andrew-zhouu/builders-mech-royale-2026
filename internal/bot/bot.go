@@ -38,10 +38,15 @@ type Params struct {
 	FFAWantCubes  int
 	FFAReturnFire float64 // only shoot back at attackers closer than this
 	Salt          int     // changes the dice only (see New)
+	LaserMechOnly bool    // never start a laser charge at a crate or a drone
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
 	FFASwap       string  // variant to switch to once the lobby is known to be a free-for-all ("" = none)
 	OpenSet       string  // variant in force from the start until the lobby is known or assumed ("" = none)
+	SquadSet      string  // variant in force while the lobby is taken to be practice ("" = none)
+	UpOffense     float64 // added to the rank of damage upgrades when choosing one (0 = defence first)
+	HealFirst     float64 // hurt below this share of our health and left alone: no shooting crates or drones (it stops the regeneration) ...
+	HealUntil     float64 // ... until back above this share (0 with HealFirst 0 = off)
 	ForceFFA      bool    // testing: assume a free-for-all from the start
 	SlotRule      bool    // WRONG, never enable: the track page says the practice slot varies each match
 	CloseDisengage float64 // disengage threshold against an attacker within ~60 m (stealth stances)
@@ -157,9 +162,10 @@ func DefaultParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
-		Salt:          3,
+		Salt:          0,
 		QuietSlip:     true, // do not start it with a mech that has not touched us, unless we hold a laser and it does not
 		QuietSlipMin:  40,
+		LaserMechOnly: true,
 		// SlotRule stays off: the track page says the practice slot varies each match
 		FFAEngage:     1.8,
 		FFADisengage:  0.95,
@@ -414,6 +420,9 @@ type Bot struct {
 	deepT      float64 // ... when we chose it
 	deepTryT   float64 // ... when we last looked for one
 	swapped     bool    // FFASwap has been applied
+	healing     bool    // HealFirst: hurt and letting the health come back before farming again
+	squadOn     bool    // the practice set (SquadSet) is in force
+	pPre        Params  // the parameters to return to if the practice set turns out to be wrong
 	openSetOn   bool    // the opening set (OpenSet) is in force
 	pBase       Params  // the parameters to return to after the opening set
 	standT      float64 // last time we stayed in a fight for want of cover close by

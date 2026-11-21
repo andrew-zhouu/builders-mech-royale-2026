@@ -129,6 +129,22 @@ func Variants() map[string]func(p *Params) {
 		"h3":         func(p *Params) { p.OpenSet = "v05" },
 		"h3s":        func(p *Params) { p.OpenSet = "v05"; p.FFASwap = "v05" },
 		"b-noquiet":  func(p *Params) { p.QuietSlip = false },
+		"v075":       func(p *Params) { p.LaserMechOnly = false },
+		// practice-only sets (applied through SquadSet) and the builds that use them
+		"sq-off":      func(p *Params) { p.UpOffense = 0.2 },
+		"sq-stand":    func(p *Params) { p.DuelDisengage = 0; p.LeaveTTD = 0; p.RetreatHP = 0 },
+		"sq-offstand": func(p *Params) { p.UpOffense = 0.2; p.DuelDisengage = 0; p.LeaveTTD = 0; p.RetreatHP = 0 },
+		"sq-drop":     func(p *Params) { p.DropGreed = 1.5 },
+		// heal before farming: everywhere, and against the practice squad only
+		"b-heal":      func(p *Params) { p.HealFirst = 0.75; p.HealUntil = 0.95 },
+		"b-heal6":     func(p *Params) { p.HealFirst = 0.6; p.HealUntil = 0.9 },
+		"b-heal9":     func(p *Params) { p.HealFirst = 0.9; p.HealUntil = 0.98 },
+		"sq-heal":     func(p *Params) { p.HealFirst = 0.75; p.HealUntil = 0.95 },
+		"q-heal":      func(p *Params) { p.SquadSet = "sq-heal" },
+		"q-off":       func(p *Params) { p.SquadSet = "sq-off" },
+		"q-stand":     func(p *Params) { p.SquadSet = "sq-stand" },
+		"q-offstand":  func(p *Params) { p.SquadSet = "sq-offstand" },
+		"q-drop":      func(p *Params) { p.SquadSet = "sq-drop" },
 		"s1":         func(p *Params) { p.Salt = 1 },
 		"s2":         func(p *Params) { p.Salt = 2 },
 		"s3":         func(p *Params) { p.Salt = 3 },
@@ -251,6 +267,7 @@ func v074(p *Params) {
 	p.ShySecs = 0
 	p.SlotRule = false
 	p.QuietSlip = false
+	p.LaserMechOnly = false
 }
 
 // oldLead is the gun lead of every build up to v0.6.1: instantaneous velocity, damped to 75%.

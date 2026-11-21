@@ -472,6 +472,18 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 		}
 	}
 	wantCubes := b.o.Self.Cubes < st.wantCubes
+	// Health comes back at 45 a second once we have neither dealt nor taken damage for 5 s, and shooting
+	// a crate or a drone counts as dealing damage. So when hurt and left alone: no crates, no drones,
+	// until it is back (cubes on the ground and weapons cost nothing).
+	if b.P.HealFirst > 0 {
+		switch {
+		case b.hp < b.maxHP*b.P.HealFirst:
+			b.healing = true
+		case b.hp >= b.maxHP*b.P.HealUntil:
+			b.healing = false
+		}
+	}
+	noShoot := b.P.HealFirst > 0 && b.healing && !danger
 	for _, it := range b.pickups {
 		if !it.Ground {
 			continue
@@ -492,11 +504,11 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 		}
 		for _, it := range b.crates {
 			// roof crates can still be shot from the ground, but the cube stays up there: skip them
-			if it.Ground {
+			if it.Ground && !noShoot {
 				consider(loot{kind: "crate", id: it.ID, pos: it.Pos, shoot: true}, 7, 2.5)
 			}
 		}
-		if !danger {
+		if !danger && !noShoot {
 			for _, tr := range b.tracks {
 				if tr.NPC && b.t-tr.LastSeen < 20 {
 					k := b.Nav.Index(tr.Pos[0], tr.Pos[1])
@@ -565,6 +577,12 @@ func (b *Bot) pickUpgrade(act *proto.Action) {
 		}
 		if b.has("lightning") >= 0 && (c.ID == "reactor" || c.ID == "capacitor") {
 			v += 0.3
+		}
+		if b.P.UpOffense > 0 {
+			switch c.ID {
+			case "gun_rate", "gun_damage", "laser_damage", "laser_charge":
+				v += b.P.UpOffense
+			}
 		}
 		if v > bv {
 			best, bv = i, v

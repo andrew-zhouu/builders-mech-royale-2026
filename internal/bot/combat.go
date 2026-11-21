@@ -340,7 +340,10 @@ func (b *Bot) engage(act *proto.Action, tg aimTarget, hasLOS, losRecent bool, hp
 			}
 			act.Fire[lasI] = hold
 			b.laserHold = hold
-		} else if allowFire && sl.cooldown <= 0.12 && inRange && (hasLOS || losRecent) {
+		} else if allowFire && sl.cooldown <= 0.12 && inRange && (hasLOS || losRecent) && (tg.mech || !b.P.LaserMechOnly) {
+			// (LaserMechOnly: a charge cannot be taken back, it halves our speed, and one that never
+			// lines up goes off by itself after two more seconds. In a real match we did that ten
+			// times running at a crate or a drone: 40 s at half speed for nothing. The gun does for those.)
 			act.Fire[lasI] = true
 			b.laserHold = true
 		}
