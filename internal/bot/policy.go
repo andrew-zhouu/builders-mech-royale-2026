@@ -514,7 +514,15 @@ func (b *Bot) think(act *proto.Action) {
 					rq.hold = true
 				}
 			default:
-				setGoal(l.pos[0], l.pos[1], 2.0, false)
+				// a laser is the one thing worth sprinting for: most opponents only take one that
+				// lies within 60 m of their spawn, and there is one within 120 m of 60% of spawns
+				sprint := false
+				if l.kind == "pickup" && b.P.LootBoost > 0 && b.energy > b.P.LootBoost && d > 25 {
+					if it := b.pickups[l.id]; it != nil && it.Kind == "laser" && b.has("laser") < 0 {
+						sprint = true
+					}
+				}
+				setGoal(l.pos[0], l.pos[1], 2.0, sprint)
 			}
 			if navigating && !goalOK {
 				// cannot get there from here: stop wanting it for a while
