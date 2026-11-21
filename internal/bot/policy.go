@@ -463,33 +463,99 @@ func (b *Bot) think(act *proto.Action) {
 	case slip:
 		// not our fight: get something solid between us, shooting back on the way
 		b.mode = "slip"
-		cx, cy := b.Nav.Pos(b.slipCell)
-		if d := setGoal(cx, cy, 2.5, b.energy > 25 && underFire); d < 0.9 || (d < 3.0 && b.hiddenHere(ths)) {
-			rq.wantW = 0
-			rq.hold = true
-			b.mode = "ambush"
+		// (first to the nearest spot out of their sight, then on from that edge of the shadow to a
+		// place that stays hidden when they take a step sideways: cover.go)
+		deepSlip := b.P.CoverMargin > 0 && b.deepCell >= 0 && b.t-b.deepT < 8 && b.t-b.lastWeaponDT > 0.45 && b.cellHidden(b.deepCell, ths)
+		if !deepSlip {
+			b.deepCell = -1
+		}
+		if deepSlip {
+			cx, cy := b.Nav.Pos(b.deepCell)
+			if d := setGoal(cx, cy, 2.5, false); d < 1.5 || !goalOK {
+				rq.wantW = 0
+				rq.hold = true
+				b.mode = "ambush"
+			}
+		} else {
+			cx, cy := b.Nav.Pos(b.slipCell)
+			if d := setGoal(cx, cy, 2.5, b.energy > 25 && underFire); d < 0.9 || (d < 3.0 && b.hiddenHere(ths)) {
+				if b.P.CoverMargin > 0 && b.t-b.deepTryT > 0.6 {
+					b.deepTryT = b.t
+					if c := b.deeperCover(ths, 45, false); c >= 0 {
+						b.deepCell, b.deepT = c, b.t
+					}
+				}
+				if b.deepCell >= 0 {
+					cx, cy = b.Nav.Pos(b.deepCell)
+					setGoal(cx, cy, 2.5, false)
+				} else {
+					rq.wantW = 0
+					rq.hold = true
+					b.mode = "ambush"
+				}
+			}
 		}
 
 	case b.retreating:
 		b.mode = "retreat"
-		if b.t-b.coverT > 0.5 {
-			b.coverCell = b.findCover(ths, 90)
-			b.coverT = b.t
+		// a leg deeper into cover, once begun, is walked to its end unless it stops being cover
+		deeper := (b.P.RunOnRange > 0 || b.P.CoverMargin > 0) && st.avoid // (free-for-all stances only)
+		deep := deeper && b.deepCell >= 0 && b.t-b.deepT < 8
+		if deep && (b.t-b.lastWeaponDT < 0.45 || !b.cellHidden(b.deepCell, ths)) {
+			deep = false // hit on the way, or it can be seen now: nearest cover first
 		}
-		if b.coverCell >= 0 {
+		if !deep {
+			b.deepCell = -1
+			if b.t-b.coverT > 0.5 {
+				b.coverCell = b.findCover(ths, 90)
+				b.coverT = b.t
+			}
+		}
+		if deep {
+			b.mode = "retreat-on"
+			cx, cy := b.Nav.Pos(b.deepCell)
+			if d := setGoal(cx, cy, 2.5, b.energy > 35 && b.nearestEye(ths) < 60); d < 1.5 || !goalOK {
+				b.deepCell = -1 // there: look again from here
+				b.coverT = -100
+			}
+		} else if b.coverCell >= 0 {
 			cx, cy := b.Nav.Pos(b.coverCell)
 			d := setGoal(cx, cy, 2.5, b.energy > 20 && underFire)
 			// "there" means actually out of their sight, not merely near the hidden cell
 			if d < 0.9 || (d < 3.0 && b.hiddenHere(ths)) {
-				rq.wantW = 0
-				rq.hold = true
-				b.mode = "heal"
+				// The nearest hidden spot is the very edge of the shadow (one step sideways and they see
+				// us again), whoever was shooting knows which corner we went behind, and health comes
+				// back just as fast on the move: go on to somewhere that lasts (cover.go)
+				if deeper && b.t-b.deepTryT > 0.6 {
+					b.deepTryT = b.t
+					if c := b.deeperCover(ths, 75, true); c >= 0 {
+						b.deepCell, b.deepT = c, b.t
+					}
+				}
+				if b.deepCell >= 0 {
+					b.mode = "retreat-on"
+					cx, cy = b.Nav.Pos(b.deepCell)
+					setGoal(cx, cy, 2.5, b.energy > 35 && b.nearestEye(ths) < 60)
+				} else {
+					rq.wantW = 0
+					rq.hold = true
+					b.mode = "heal"
+				}
 			}
 		} else if from := b.fleeFrom(tgt, ths); from != nil {
 			// nowhere to hide: back away from the closest threat while facing it
 			dx, dy := norm2(b.pos[0]-from.tr.Pos[0], b.pos[1]-from.tr.Pos[1])
 			gx, gy := b.pos[0]+dx*30, b.pos[1]+dy*30
 			setGoal(gx, gy, 2.0, b.energy > 30)
+		} else if b.P.CoverMargin > 0 && st.avoid && zi.outNext < -5 && b.t-b.lastNpcDT > 4 && b.t-b.lastWeaponDT < 30 {
+			// (not with a drone plinking at us, which stops the health coming back: walk on then; and
+			// not for ever, in case something else does)
+			// nobody on us and nobody in mind any more: stay behind what we found until the health is
+			// back, instead of strolling off towards the middle (outside the next circle we do walk:
+			// stopping there only to be hurried on a moment later gets us nowhere)
+			rq.wantW = 0
+			rq.hold = true
+			b.mode = "heal"
 		} else {
 			setGoal(zi.goal[0], zi.goal[1], 1.5, false)
 		}

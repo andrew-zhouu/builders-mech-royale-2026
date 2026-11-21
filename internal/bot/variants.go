@@ -114,8 +114,14 @@ func Variants() map[string]func(p *Params) {
 		"b-jitj":  func(p *Params) { p.StrafeMin, p.StrafeMax = 0.25, 0.55; p.Jink = 0.6 },
 		// v0.7 and v0.7.1 exactly as published
 		"v07":  func(p *Params) { v07(p) },
-		"v071": func(p *Params) { p.EdgeHold = 0; p.NoMortar = false },
-		"v072": func(p *Params) { p.NoMortar = false },
+		"v071": func(p *Params) { p.EdgeHold = 0; p.NoMortar = false; p.RunOnRange = 0; p.CoverMargin = 0 },
+		"v072": func(p *Params) { p.NoMortar = false; p.RunOnRange = 0; p.CoverMargin = 0 },
+		"v073": func(p *Params) { p.RunOnRange = 0; p.CoverMargin = 0 },
+		// cover that lasts (cover.go): the parts on their own, and other settings
+		"b-run0":   func(p *Params) { p.RunOnRange = 0 },
+		"b-cm0":    func(p *Params) { p.CoverMargin = 0 },
+		"b-cm14":   func(p *Params) { p.CoverMargin = 14 },
+		"b-run120": func(p *Params) { p.RunOnRange = 120 },
 		// the rules read off the real first-contact data: cover unless laser-against-none; hunt only then
 		"b-real":    func(p *Params) { p.CoverFirst = true; p.HuntLaserEdge = true },
 		"b-realh":   func(p *Params) { p.CoverFirst = true; p.HuntLaserEdge = true; p.HuntRangeLaser = 200 },
@@ -202,6 +208,8 @@ func v05(p *Params) {
 	p.DropStick = false
 	p.RoofLeaveQuiet = 0
 	p.RoofStandCheck = false
+	p.RunOnRange = 0
+	p.CoverMargin = 0
 	oldLead(p)
 }
 
@@ -232,6 +240,8 @@ func v061(p *Params) {
 	p.LootHiddenBias = 0
 	p.EdgeHold = 0
 	p.NoMortar = false
+	p.RunOnRange = 0
+	p.CoverMargin = 0
 	oldLead(p)
 }
 
@@ -242,6 +252,8 @@ func v07(p *Params) {
 	p.LootHiddenBias = 0
 	p.EdgeHold = 0
 	p.NoMortar = false
+	p.RunOnRange = 0
+	p.CoverMargin = 0
 }
 
 // brawl2 is the armed-farmer parameter set (the defaults since v0.6): the published practice behaviour
