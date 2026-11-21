@@ -12,8 +12,25 @@ type stance struct {
 	disengage   float64 // evade below this
 	hunt        bool    // chase favourable targets that are not on us
 	stealth     bool    // hide, stay out of sight, loot only when quiet
+	avoid       bool    // decline even exchanges at range: slip behind cover (shooting back) instead
 	lootRadius  float64
 	wantCubes   int
+}
+
+// brawlStance is the free-for-all stance adopted after the first real matches: armed, farming, fighting
+// with an edge and declining coin flips. Also used while we do not know the lobby yet.
+func (b *Bot) brawlStance(name string) stance {
+	return stance{name: name, engageRatio: b.P.BrawlEngage, disengage: b.P.BrawlDisengage, hunt: b.P.BrawlHunt,
+		avoid: b.P.AvoidAdv > 0, lootRadius: b.P.BrawlLootRadius, wantCubes: b.P.BrawlWantCubes}
+}
+
+// realModel reports whether the measured (team bot) hit rates apply: in a free-for-all, and until we
+// know better. Against the house squad the older numbers stay (they are what scored in practice).
+func (b *Bot) realModel() bool {
+	if b.P.HitModel < 1 {
+		return false
+	}
+	return !b.P.PracticeAware || b.ffa || b.t < b.P.OpenSecs
 }
 
 // belief updates what we think the lobby is and returns the matching stance.
@@ -48,8 +65,14 @@ func (b *Bot) belief() stance {
 		// second place is banked: nothing to lose by fighting for first
 		return stance{name: "duel", engageRatio: 0.0, disengage: 0.45, hunt: true, lootRadius: 150, wantCubes: 40}
 	case b.ffa && b.P.PracticeAware:
+		if b.P.Brawl {
+			return b.brawlStance("ffa")
+		}
 		return stance{name: "ffa", engageRatio: b.P.FFAEngage, disengage: b.P.FFADisengage, hunt: false, stealth: true, lootRadius: b.P.FFALootRadius, wantCubes: b.P.FFAWantCubes}
 	case b.t < b.P.OpenSecs && b.P.PracticeAware:
+		if b.P.Brawl {
+			return b.brawlStance("open")
+		}
 		// not known yet: careful, but not shy about loot close by
 		return stance{name: "open", engageRatio: 1.5, disengage: 0.9, hunt: false, stealth: true, lootRadius: 110, wantCubes: b.P.WantCubes}
 	}

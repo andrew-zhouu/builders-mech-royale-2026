@@ -412,6 +412,45 @@ func gunHitProb(d float64) float64 {
 	return 0.05
 }
 
+// hitTable interpolates a hit rate over range from (distance, rate) knots.
+func hitTable(d float64, knots [][2]float64) float64 {
+	if d <= knots[0][0] {
+		return knots[0][1]
+	}
+	for i := 1; i < len(knots); i++ {
+		if d <= knots[i][0] {
+			f := (d - knots[i-1][0]) / (knots[i][0] - knots[i-1][0])
+			return knots[i-1][1] + (knots[i][1]-knots[i-1][1])*f
+		}
+	}
+	return knots[len(knots)-1][1]
+}
+
+// Measured in our own real free-for-all matches against the top teams (Sat 21 Nov, 280 of our shots,
+// 250 of theirs at us) and consistent with the whole field's rates: beyond about 100 m a gun shot at
+// a mech that is watching the shooter is a lottery (everyone side-steps during the half second of
+// flight), for us as much as for them.
+var (
+	realMyGun    = [][2]float64{{30, 0.95}, {60, 0.86}, {100, 0.55}, {150, 0.28}, {200, 0.18}, {230, 0.12}}
+	realTheirGun = [][2]float64{{30, 0.92}, {60, 0.78}, {100, 0.57}, {150, 0.32}, {200, 0.15}, {230, 0.10}}
+)
+
+// myGunHit / theirGunHit are the hit-rate models in use (HitModel 0: what we believed before the first
+// real matches, 1: measured).
+func (b *Bot) myGunHit(d float64) float64 {
+	if b.realModel() {
+		return hitTable(d, realMyGun)
+	}
+	return gunHitProb(d)
+}
+
+func (b *Bot) theirGunHit(d float64) float64 {
+	if b.realModel() {
+		return hitTable(d, realTheirGun)
+	}
+	return theirGunHitProb(d)
+}
+
 // theirGunHitProb is how often a typical opponent's gun hits us at a range: measured accuracy of the
 // top-16 bots on targets that do not dodge (98/88/57/41/17% by band), reduced a little at range
 // because we do side-step what we can see coming.
@@ -446,7 +485,11 @@ func (b *Bot) dpsOf(gun, laser, light, mortar bool, cubes int, d float64, energy
 	if laser {
 		l := w["laser"]
 		if d < stat(l, "range", 280) {
-			total += stat(l, "damage", 315) / (stat(l, "charge", 0.75) + stat(l, "cooldown", 1.65)) * 0.85
+			lh := 0.85
+			if b.realModel() {
+				lh = 0.75 // the field's lasers land 73% (most misses are beams stopped by cover)
+			}
+			total += stat(l, "damage", 315) / (stat(l, "charge", 0.75) + stat(l, "cooldown", 1.65)) * lh
 		}
 	}
 	if light && energyOK {
@@ -467,7 +510,7 @@ func (b *Bot) dpsOf(gun, laser, light, mortar bool, cubes int, d float64, energy
 func (b *Bot) myDPS(d float64) float64 {
 	// our own gun only counts inside the range we actually pull the trigger at
 	gun := b.has("gun") >= 0 && d < b.P.GunMaxRange
-	return b.dpsOf(gun, b.has("laser") >= 0, b.has("lightning") >= 0, b.has("mortar") >= 0, b.o.Self.Cubes, d, b.energy > 15, gunHitProb)
+	return b.dpsOf(gun, b.has("laser") >= 0, b.has("lightning") >= 0, b.has("mortar") >= 0, b.o.Self.Cubes, d, b.energy > 15, b.myGunHit)
 }
 
 func (b *Bot) theirDPS(tr *Track, d float64) float64 {
@@ -485,7 +528,7 @@ func (b *Bot) theirDPS(tr *Track, d float64) float64 {
 			laser = false
 		}
 	}
-	return b.dpsOf(gun, laser, tr.Light, tr.Mortar, tr.Cubes, d, true, theirGunHitProb)
+	return b.dpsOf(gun, laser, tr.Light, tr.Mortar, tr.Cubes, d, true, b.theirGunHit)
 }
 
 // advantage is (time they need to kill us) / (time we need to kill them); > 1 favours us.

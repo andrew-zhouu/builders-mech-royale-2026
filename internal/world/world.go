@@ -543,6 +543,13 @@ func (w *World) WallDist(x, y, z0, z1, maxR float64) float64 {
 // Raycast returns the distance along the unit direction (dx,dy,dz) from (ox,oy,oz) to the first solid
 // (terrain or prism), or maxT when nothing is hit within maxT.
 func (w *World) Raycast(ox, oy, oz, dx, dy, dz, maxT float64) float64 {
+	// A NaN anywhere would make the grid walk below never terminate: treat it as "nothing hit".
+	if ox != ox || oy != oy || oz != oz || dx != dx || dy != dy || dz != dz {
+		return maxT
+	}
+	if maxT != maxT || maxT <= 0 {
+		return 0
+	}
 	best := w.raycastPrisms(ox, oy, oz, dx, dy, dz, maxT)
 	return w.raycastTerrain(ox, oy, oz, dx, dy, dz, best)
 }
@@ -576,7 +583,9 @@ func (w *World) raycastPrisms(ox, oy, oz, dx, dy, dz, maxT float64) float64 {
 		tDY = -gridCell / dy
 	}
 	tEnter := 0.0
-	for {
+	// the walk visits at most one cell per row plus one per column; the cap is a hard stop that
+	// only matters if the arithmetic ever goes wrong
+	for guard := 0; guard < 2*(w.gnx+w.gny)+8; guard++ {
 		c := cj*w.gnx + ci
 		tExit := math.Min(tMaxX, tMaxY)
 		// walls

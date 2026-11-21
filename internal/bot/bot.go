@@ -50,6 +50,41 @@ type Params struct {
 	OpenSecs      float64 // how long we stay careful before assuming the cooperating squad
 	DropRadius    float64 // how far we travel for a supply drop
 	LeaveTTD      float64 // with several attackers, leave when we would be dead in this many seconds
+	PatientSecs   float64 // squad stance: until this time (and below PatientCubes) farm instead of killing hunters (0 = off)
+	PatientCubes  int
+	PatientRange  float64 // ... unless the hunter is closer than this
+	// hideouts from the embedded visibility map (stealth stances)
+	UseHideMap  bool
+	HideSeenW   float64 // weight of the share of ground that can see a place
+	HideHitW    float64 // weight of the share that has a line of fire to our centre there
+	HideDistW   float64 // points per metre of travel to get there
+	HideClimbW  float64 // points per metre of wall to climb
+	HideStick   float64 // bonus for the place we already chose
+	StealthFightRange float64 // stealth stances: stand and fight an attacker only inside this range (else slip away)
+	QuietHoldS        float64 // seconds without anyone near or watching before we call it quiet
+	LaserValue        float64 // pickup value of a laser (the gun is 2.0, a mortar 1.2)
+	LightningValue    float64
+	ArmSwapMin        float64 // go out of our way for a weapon that replaces one we hold only if it is worth this much more
+	HitModel          int     // 0: gun hit rates as believed before the real matches, 1: as measured in them
+	PlanV2            bool    // fight plan counts the damage we deal while changing range, not only what we take
+	KiteNeedsLaser    bool    // back away from several attackers only when we hold a laser
+	ExchangeW         float64 // how much the running exchange with a target (dealt vs taken) moves our estimate of the fight (0 = off)
+	// "brawl": the free-for-all stance built after the first real matches (replaces stealth when on)
+	Brawl           bool
+	BrawlEngage     float64 // start a fight with someone who is not on us above this advantage
+	BrawlDisengage  float64
+	BrawlHunt       bool
+	BrawlLootRadius float64
+	BrawlWantCubes  int
+	AvoidAdv        float64 // attacked from beyond AvoidRange with less advantage than this: slip behind cover, shooting back (0 = always stand and fight)
+	AvoidRange      float64
+	AvoidCover      float64 // ... if cover is within this path length
+	ProvokeRule     bool    // being looked at from beyond AvoidRange is not an attack: hold fire until touched
+	PlinkMaxDPS     float64 // under lighter fire than this from range (no laser on us), keep farming and shoot back in between (0 = off)
+	HuntRange       float64 // start a fight with a favourable target inside this range
+	HuntRangeLaser  float64 // ... when we hold a laser
+	KiteMin       float64 // against two or more attackers hold this range band from the nearest (0 = off)
+	KiteMax       float64
 	RoofFirstSecs float64 // opening: for this long, getting onto a nearby roof beats arming (0 = off)
 	RoofFirstDist float64 // ... if an access point is within this distance
 }
@@ -85,6 +120,37 @@ func DefaultParams() Params {
 		OpenSecs:       24,
 		DropRadius:     300,
 		LeaveTTD:       10,
+		UseHideMap:     false, // stealth hideouts: unused by the brawl stance (kept for the variants)
+		HideSeenW:      0.6,
+		HideHitW:       0.9,
+		HideDistW:      0.16,
+		HideClimbW:     0.5,
+		HideStick:      12,
+		StealthFightRange: 140,
+		QuietHoldS:        3,
+		LaserValue:        6.0,
+		LightningValue:    2.6,
+		ArmSwapMin:        1.0,
+		HitModel:          1,
+		PlanV2:            true,
+		KiteNeedsLaser:    true,
+		Brawl:             true,
+		AvoidAdv:          1.25,
+		BrawlEngage:       1.3,
+		BrawlDisengage:    0.75,
+		BrawlHunt:         true,
+		BrawlLootRadius:   220,
+		BrawlWantCubes:    15,
+		AvoidRange:        85,
+		AvoidCover:        55,
+		ProvokeRule:       false, // both rules below are experiments (variants b-prov, b-plink): not better in the re-enactment yet
+		PlinkMaxDPS:       0,
+		HuntRange:         130,
+		HuntRangeLaser:    130,
+		KiteMin:        130,
+		KiteMax:        190,
+		PatientCubes:   10,
+		PatientRange:   70,
 	}
 }
 
@@ -109,6 +175,7 @@ type Track struct {
 	HurtMeT  float64 // last time it damaged us
 	HurtMe   float64 // decayed damage it dealt to us
 	IHurtT   float64 // last time we damaged it
+	IHurt    float64 // decayed damage we dealt to it
 	AimAtMeT float64 // last time its aim pointed at us
 	SeenT0   float64
 	PhantomT float64 // last time it hit us while unseen (its Pos is then a guess along the bearing)
@@ -247,6 +314,7 @@ type Bot struct {
 	evadeT      float64
 	hideT       float64
 	lastLabel   string
+	modeLabel   string // stance:mode of this decision
 	lastTraceT  float64
 	lastNpcDT   float64
 	seenT       []float32 // coarse grid: when we last looked at each cell
@@ -279,6 +347,15 @@ type Bot struct {
 	roof        roofPlan
 	roofCoverC  int
 	roofCoverT  float64
+	unquietT    float64  // last time someone was near or watching
+	slipCell    int      // cover we are slipping to (brawl stance)
+	slipT       float64  // when it was last looked for
+	slipOnT     float64  // last time we decided to slip
+	hm          *hideMap // embedded visibility map (nil if it does not fit this arena)
+	hideCell    int      // hideout we are heading for or sitting in (-1 none)
+	hideOut     hideout
+	hideOutOK   bool
+	hideOutT    float64
 	roofFirstOK bool
 	roofFirstChecked bool
 	// debug accounting (Stats)
@@ -331,7 +408,15 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	b.corneredT = -100
 	b.mode = "init"
 	b.roof.id = -1
+	b.roof.want, b.roof.spot = -1, -1
 	b.roofCoverC = -1
+	b.hideCell = -1
+	b.hideOutT = -100
+	b.unquietT = -100
+	b.slipCell, b.slipT, b.slipOnT = -1, -100, -100
+	if p.UseHideMap {
+		b.hm = getHideMap(nav)
+	}
 	b.roofFirstOK = true
 	b.banUntil = map[int]float64{}
 	b.coverT = -100
@@ -353,10 +438,10 @@ var Trace = os.Getenv("MECH_TRACE") != ""
 var Stats = os.Getenv("MECH_STATS") != ""
 
 func (b *Bot) trace(act *proto.Action) {
-	if act.Label == b.lastLabel && b.t-b.lastTraceT < 5 {
+	if b.modeLabel == b.lastLabel && b.t-b.lastTraceT < 5 {
 		return
 	}
-	b.lastLabel, b.lastTraceT = act.Label, b.t
+	b.lastLabel, b.lastTraceT = b.modeLabel, b.t
 	tg := ""
 	if tr := b.tracks[b.targetID]; tr != nil {
 		tg = fmt.Sprintf(" tgt=%d d=%.0f los=%v hp=%.0f", tr.ID, dist3(b.pos, tr.Pos), tr.LOS, tr.HP)
@@ -368,8 +453,8 @@ func (b *Bot) trace(act *proto.Action) {
 		}
 	}
 	fmt.Fprintf(os.Stderr, "[%d] t=%6.1f alive=%2d hp=%4.0f/%4.0f en=%3.0f cubes=%2d pos=(%.0f,%.0f,%.0f) %-18s w=%s proj=%d mv=(%+.1f,%+.1f)%s%s\n",
-		b.H.Slot, b.t, b.o.Alive, b.hp, b.maxHP, b.energy, b.o.Self.Cubes, b.pos[0], b.pos[1], b.pos[2], act.Label, w, len(b.o.Projectiles), act.Move[0], act.Move[1], map[bool]string{true: " BOOST", false: ""}[act.Boost], tg)
-	if strings.Contains(act.Label, "zone") {
+		b.H.Slot, b.t, b.o.Alive, b.hp, b.maxHP, b.energy, b.o.Self.Cubes, b.pos[0], b.pos[1], b.pos[2], b.modeLabel, w, len(b.o.Projectiles), act.Move[0], act.Move[1], map[bool]string{true: " BOOST", false: ""}[act.Boost], tg)
+	if strings.Contains(b.modeLabel, "zone") {
 		z := &b.o.Zone
 		fmt.Fprintf(os.Stderr, "      zone cur=(%.0f,%.0f r%.0f) dcur=%.0f next=(%.0f,%.0f r%.0f) dnext=%.0f shrink=%.0f..%.0f inzone=%v goal=(%.0f,%.0f) walk=%v comp=%d ground=%v jump=%v\n",
 			z.Center[0], z.Center[1], z.Radius, hyp(b.pos[0]-z.Center[0], b.pos[1]-z.Center[1]), z.NextCenter[0], z.NextCenter[1], z.NextRadius,
@@ -554,6 +639,7 @@ func (b *Bot) observe(o *proto.Obs) {
 		tr.Listed = false
 		tr.LOS = false
 		tr.HurtMe *= math.Exp(-b.decide / 4.0)
+		tr.IHurt *= math.Exp(-b.decide / 4.0)
 	}
 	// which walkable region are we in (the stadium floor, for one, is cut off from the rest)
 	if c := b.Nav.Nearest(b.pos[0], b.pos[1], 2.9, 9, 4); c >= 0 && b.onGroundLevel() {
@@ -724,6 +810,7 @@ func (b *Bot) observe(o *proto.Obs) {
 			}
 			if tr := b.tracks[e.Target]; tr != nil {
 				tr.IHurtT = b.t
+				tr.IHurt += e.Amount
 			}
 		case "kill":
 			b.kills++

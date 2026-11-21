@@ -19,13 +19,17 @@ func (b *Bot) fightPlan(tr *Track, d float64) (adv, rmin, rmax float64) {
 		if mine < 1 {
 			return
 		}
-		// damage taken while changing range
+		// damage taken (and, in the newer accounting, dealt) while changing range
 		move := math.Abs(d - r)
-		cost := 0.0
+		cost, gain := 0.0, 0.0
 		if !here && move > 8 {
 			mid := (d + r) / 2
 			// closing is slower than their backing away is easy: assume 9 m/s net
 			cost = b.theirDPS(tr, mid) * (1 - b.armor) * b.dodgeFactor(mid, tr) * (move / 9.0) * 0.8
+			if b.P.PlanV2 && b.realModel() {
+				// the torso keeps shooting while the legs change the range
+				gain = b.myDPS(mid) * (move / 9.0) * 0.8
+			}
 			if r > d && !tr.NPC {
 				// we cannot hold a longer range against something that wants to close; discount it
 				cost += 60
@@ -35,9 +39,13 @@ func (b *Bot) fightPlan(tr *Track, d float64) (adv, rmin, rmax float64) {
 		if left <= 0 {
 			return
 		}
+		hpT := hp - gain
+		if hpT < 20 {
+			hpT = 20
+		}
 		a := 10.0
 		if theirs >= 1 {
-			a = (left / theirs) / (hp / mine)
+			a = (left / theirs) / (hpT / mine)
 		}
 		if here {
 			a *= 1.05 // staying put is free
