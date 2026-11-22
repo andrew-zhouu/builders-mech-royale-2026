@@ -360,6 +360,12 @@ func Variants() map[string]func(p *Params) {
 		// fight (StealthCoverFirst); k29 = and never stands to fight on the estimate alone
 		"v05fixk28": func(p *Params) { keepAway20(p); p.StealthCoverFirst = 45 },
 		"v05fixk29": func(p *Params) { keepAway20(p); p.StealthCoverFirst, p.FFAEngage = 45, 99 },
+		// (the same with the seek practice stance of v0.136, for the identity check against it)
+		"gg-c9": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hN2+quiet3.0", 1795363200
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateLateAlive, p.GateDoubt = "v05fixk29", "ffa-fixrf9z", 240, 4, gateDoubtS
+		},
 		"gg-c8": func(p *Params) {
 			pfx(p)
 			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", 1795363200
