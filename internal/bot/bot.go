@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 
 	"mechroyale/internal/proto"
@@ -43,6 +44,7 @@ type Params struct {
 	NpcGiveUp     float64 // the same for a drone we are trying to shoot
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
+	SlotPlan      string  // dice and practice set by seat group, "set.dice,set.dice,..." (see applySlotPlan)
 	HouseModel    bool    // practice stance: reckon with the house bots' measured (poor) accuracy instead of the team bots'
 	KillFocus     float64 // how much a target's lost health counts when choosing whom to shoot (1 = as always)
 	HuntAfter     float64 // no fights of our own starting before this match time (0 = from the start)
@@ -159,15 +161,45 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "x-house"
+var BuildVariant = "gp:-.1,-.0,-.0,-.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
 	p := baseParams()
-	if BuildVariant != "" {
+	if strings.HasPrefix(BuildVariant, "gp:") {
+		// a seat plan on the practice-experiment base (see applySlotPlan)
+		pfx(&p)
+		p.SlotPlan = BuildVariant[3:]
+	} else if BuildVariant != "" {
 		if f := Variants()[BuildVariant]; f != nil {
 			f(&p)
 		}
+	}
+	return p
+}
+
+// applySlotPlan gives each seat group its own dice and practice set. SlotPlan is a comma-separated list
+// of "set.dice" entries; the group is the seat number modulo the number of entries; set "-" keeps the
+// practice stance as it is, any other name selects the practice set "sq-<name>". Practice is the same
+// 48 hidden matches for every submission and the seat varies from match to match, so a build that
+// changes one group's entry replays the other groups' matches exactly and its official score differs
+// from the reference by that group's matches alone: gains found in different groups add up. In a
+// free-for-all only the dice differ (the practice set never applies there).
+func applySlotPlan(p Params, slot int) Params {
+	parts := strings.Split(p.SlotPlan, ",")
+	if slot < 0 {
+		slot = -slot
+	}
+	e := strings.TrimSpace(parts[slot%len(parts)])
+	set, dice := e, ""
+	if i := strings.LastIndex(e, "."); i >= 0 {
+		set, dice = e[:i], e[i+1:]
+	}
+	if n, err := strconv.Atoi(dice); err == nil {
+		p.Salt = n
+	}
+	if set != "" && set != "-" {
+		p.SquadSet = "sq-" + set
 	}
 	return p
 }
@@ -556,6 +588,9 @@ func Factory(h *proto.Hello, w *world.World, nav *world.Nav) *Bot {
 }
 
 func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
+	if p.SlotPlan != "" {
+		p = applySlotPlan(p, h.Slot)
+	}
 	b := &Bot{P: p, H: h, C: &h.Config, W: w, Nav: nav}
 	if p.OpenSet != "" {
 		// a different parameter set for the opening, while we do not know what kind of lobby this is

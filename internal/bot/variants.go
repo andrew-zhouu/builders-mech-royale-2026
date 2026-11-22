@@ -155,6 +155,17 @@ func Variants() map[string]func(p *Params) {
 		"sq-hunt":  func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200 },
 		"sq-c10":   func(p *Params) { p.WantCubes = 10 },
 		"sq-offst": func(p *Params) { p.UpOffense = 0.2; p.DuelDisengage = 0; p.LeaveTTD = 0; p.RetreatHP = 0 },
+		// seat plans (see applySlotPlan), for the local checks of that mechanism
+		"gp-id":   func(p *Params) { pfx(p); p.SlotPlan = "-.0,-.0,-.0,-.0" },
+		"gp-a1":   func(p *Params) { pfx(p); p.SlotPlan = "-.1,-.0,-.0,-.0" },
+		"gp-c1":   func(p *Params) { pfx(p); p.SlotPlan = "-.0,-.0,-.1,-.0" },
+		"gp-h2":   func(p *Params) { pfx(p); p.SlotPlan = "-.0,house.0,-.0,-.0" },
+		"p74f-s1": func(p *Params) { pfx(p); p.Salt = 1 },
+		// the free-for-all brawl stance for the whole practice match (the lobby stays "not known yet")
+		"sq-open":   func(p *Params) { p.OpenSecs = 1e9 },
+		"x-open":    func(p *Params) { pfx(p); p.SquadSet = "sq-open" },
+		"sq-drop2":  func(p *Params) { p.DropGreed = 1.5 },
+		"x-drop":    func(p *Params) { pfx(p); p.SquadSet = "sq-drop2" },
 		"sq-house":  func(p *Params) { p.HouseModel = true },
 		"x-house":   func(p *Params) { pfx(p); p.SquadSet = "sq-house" },
 		"sq-housek": func(p *Params) { p.HouseModel = true; p.KillFocus = 4; p.UpOffense = 0.2 },
