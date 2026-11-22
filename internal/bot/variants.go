@@ -1069,6 +1069,12 @@ var gatePlans = []string{
 	"hF+quiet3.0",    // j
 	"hH+quiet3.0",    // k
 	"hC+quiet3.0",    // l
+	"pF+quiet3.0",    // m
+	"qA+quiet3.0",    // n
+	"qB+quiet3.0",    // o
+	"qC+quiet3.0",    // p
+	"qD+quiet3.0",    // q
+	"qE+quiet3.0",    // r
 }
 
 var huntSweep = map[string]func(p *Params){
@@ -1105,7 +1111,49 @@ var huntSweep = map[string]func(p *Params){
 	"hd4": func(p *Params) { p.DropRun, p.DropRunHP = 420, 0.6 },
 	"hO": func(p *Params) { p.RoofInSquad = true },
 	"hP": func(p *Params) { p.KiteMin, p.KiteMax = 90, 150 },
+	// third round (Sunday 08:00), around hN3 (seek, thin odds, no farming): one more change each
+	"pA": func(p *Params) { seek3(p); p.FinishFrac, p.FinishRange, p.FinishMinHP, p.FinishStick = 0.3, 120, 0.25, 3 },
+	"pB": func(p *Params) { seek3(p); p.EngageRatio = 0.4 },
+	"pC": func(p *Params) { seek3(p); p.EngageRatio = 0.8 },
+	"pD": func(p *Params) { seek3(p); p.SeekHP, p.HuntHP = 0.5, 0.4 },
+	"pE": func(p *Params) { seek3(p); p.HuntRange, p.HuntRangeLaser = 230, 260 },
+	"pF": func(p *Params) { seek3(p); p.DuelDisengage, p.LeaveTTD, p.RetreatHP = 0, 0, 0 },
+	"pG": func(p *Params) { seek3(p); p.KillFocus = 4 },
+	"pH": func(p *Params) { seek3(p); p.HouseModel = true },
+	"pI": func(p *Params) { seek3(p); p.UpOffense = 0.2 },
+	"pJ": func(p *Params) { seek3(p); p.DropRun = 260 },
+	"pK": func(p *Params) { seek3(p); p.Jink = 0.5 },
+	"pL": func(p *Params) { seek3(p); p.StrafeMin, p.StrafeMax = 0.2, 0.7 },
+	"pM": func(p *Params) { seek3(p); p.StrafeMin, p.StrafeMax = 0.6, 1.8 },
+	"pN": func(p *Params) { seek3(p); p.GunMaxRange = 180 },
+	"pO": func(p *Params) { seek3(p); p.GunMaxRange = 280 },
+	"pP": func(p *Params) { seek3(p); p.LeadDamp = 0.85 },
+	"pQ": func(p *Params) { seek3(p); p.LeadDamp = 0.45 },
+	"pR": func(p *Params) { seek3(p); p.Seek, p.SeekRange = 60, 450 },
+	"pS": func(p *Params) { seek3(p); p.RetreatHP, p.ReturnHP = 0.3, 0.7 },
+	"pT": func(p *Params) { seek3(p); p.RetreatHP = 0.6 },
+	"pV": func(p *Params) { seek3(p); p.HuntRange, p.HuntRangeLaser = 130, 160 },
+	// combinations of the best of the third round (stand = never retreat from the squad: 5.79 against
+	// 5.65; house-bot accuracy model 5.74; longer hunting range 5.71; slower strafe 5.71)
+	"qA": func(p *Params) { seek3(p); stand(p); p.HouseModel = true },
+	"qB": func(p *Params) { seek3(p); stand(p); p.HuntRange, p.HuntRangeLaser = 230, 260 },
+	"qC": func(p *Params) { seek3(p); stand(p); p.WantCubes = 3 },
+	"qD": func(p *Params) {
+		seek3(p)
+		stand(p)
+		p.HouseModel = true
+		p.HuntRange, p.HuntRangeLaser = 230, 260
+		p.StrafeMin, p.StrafeMax = 0.6, 1.8
+	},
+	"qE": func(p *Params) { stand(p) },
 }
+
+// stand: never retreat from the squad (it follows anyway).
+func stand(p *Params) { p.DuelDisengage, p.LeaveTTD, p.RetreatHP = 0, 0, 0 }
+
+// seek3 is the practice stance hN3 on top of sq-hunt: goes looking for the next squad member, at thinner
+// odds, and never stops to farm cubes.
+func seek3(p *Params) { p.EngageRatio, p.Seek, p.WantCubes = 0.6, 30, 0 }
 
 // v05 restores the parameters of the published v0.5.
 func v05(p *Params) {
