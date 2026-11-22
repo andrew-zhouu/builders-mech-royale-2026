@@ -44,6 +44,7 @@ type Params struct {
 	NpcGiveUp     float64 // the same for a drone we are trying to shoot
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
+	RetreatPest   bool    // retreating with a drone shooting at us and no mech on us: shoot the drone
 	HostileMem    float64 // the hold-fire rules: a mech that has hurt us counts as an attacker for this many seconds
 	DropRun       float64 // practice stance: break off for a supply drop within this many metres (0 = only when idle, as before)
 	DropRunHP     float64 // ... when our health is below this fraction (or we have fewer than 10 cubes)
@@ -172,7 +173,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gp:hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.1,hN2+quiet3.2,hunt+quiet.0"
+var BuildVariant = "gp:hunt+quiet.2,hunt+quiet.1,hunt.0,hN2+quiet.2,hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {

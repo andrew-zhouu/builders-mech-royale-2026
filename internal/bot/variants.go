@@ -169,7 +169,31 @@ func Variants() map[string]func(p *Params) {
 			p.HostileMem = 30
 		},
 		"p74q2":   func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq2", "ffa-fixrf2", 50 },
+		// ... and a hurt mech shoots the drone that is plinking at it (RetreatPest)
+		"v05fixq3": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest = 30, true
+		},
+		"ffa-fixrf3": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest = 30, true
+		},
+		"p74q3": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq3", "ffa-fixrf3", 50 },
 		"o-quiet3": func(p *Params) { p.QuietSlip, p.QuietSlipMin, p.HostileMem = true, 40, 30 },
+		// o-roof: the v0.5 opening (stealth: a weapon close by, then a roof, out of sight), holding fire
+		// until touched. In the real matches v0.5 died inside a minute in 2 of 24 (10 AM to 1 PM) where
+		// the ground opening of the later builds dies in a third; its practice cost was about 0.1 a match
+		// (v0.9, v0.9.1), which the seat tests can now price seat by seat.
+		"o-roof": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem = 30
+		},
+		"x-huntr":  func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-roof" },
+		"x-huntv5": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "v05fix" },
 		"gp-c71":   func(p *Params) { pfx(p); p.SlotPlan = "hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0" },
 		// Practice experiments: v0.7.4 for the first 24 s, the v0.13 play (no mortars) in a free-for-all,
 		// and a different practice stance each. Only the official score can judge them; whatever they
@@ -474,7 +498,8 @@ func pfx(p *Params) {
 	// (from v0.67 on the quiet phase after detection also holds its fire until touched: v05fixq; from
 	// v0.96 on a mech that has hurt us stays an attacker for 30 s instead of 4: v05fixq2, ffa-fixrf2.
 	// Free-for-all play only: practice never gets there, so practice scores are as before.)
-	p.FFASwap, p.FFALate, p.FFALateT = "v05fixq2", "ffa-fixrf2", 50
+	// From v0.104 on: v05fixq3, ffa-fixrf3 (a hurt mech also shoots the drone that is plinking at it).
+	p.FFASwap, p.FFALate, p.FFALateT = "v05fixq3", "ffa-fixrf3", 50
 }
 
 // v074 restores the parameters of the published v0.7.4.

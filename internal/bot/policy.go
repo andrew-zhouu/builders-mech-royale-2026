@@ -437,7 +437,8 @@ func (b *Bot) think(act *proto.Action) {
 		return d
 	}
 	holdFire := false
-	peekCharge := false // peek fight: start charging the laser now, out of sight
+	retreatPest := false // retreating with a drone on us and no mech in sight: the torso deals with the drone
+	peekCharge := false  // peek fight: start charging the laser now, out of sight
 	direct := false     // the action's movement was written directly (jet climb): skip the ground planner
 	// jetting up a wall in someone's sights is how we died in our first real match
 	b.holdClimb = st.avoid && (len(watchers) > 0 || underFire)
@@ -690,6 +691,19 @@ func (b *Bot) think(act *proto.Action) {
 		}
 		if st.stealth && tgt != nil && tgt.d > b.P.FFAReturnFire {
 			holdFire = true
+		}
+		// RetreatPest: a drone plinking at a hurt mech stops its health coming back for as long as it
+		// lives, and walking away does not shake it. (Three real matches ended that way: 26 s of drone
+		// fire from 594 health down to 19 in one, and twice a drone's chip damage kept a duel's winner
+		// at a quarter health until the next mech came by.) With no mech on us right now: shoot it.
+		if b.P.RetreatPest {
+			if tr := b.pest(); tr != nil && tr.LOS && dist2(b.pos, tr.Pos) < 110 &&
+				(tgt == nil || !tgt.tr.LOS || (b.t-tgt.tr.HurtMeT > 3 && tgt.d > 60)) {
+				at := b.targetOf(tr)
+				shootItem = &at
+				shootHP = tr.HP
+				retreatPest = true
+			}
 		}
 
 	case wantFight:
@@ -1010,6 +1024,8 @@ func (b *Bot) think(act *proto.Action) {
 		}
 	}
 	switch {
+	case retreatPest && shootItem != nil:
+		b.engage(act, *shootItem, true, true, shootHP, true)
 	case unseen && (tgt == nil || !tgt.engaged || !tgt.tr.LOS):
 		act.Aim = [2]float64{b.lastDmgBear, 0}
 		act.HasAim = true
