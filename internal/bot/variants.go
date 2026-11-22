@@ -1146,6 +1146,23 @@ var huntSweep = map[string]func(p *Params){
 		p.StrafeMin, p.StrafeMax = 0.6, 1.8
 	},
 	"qE": func(p *Params) { stand(p) },
+	// fourth round, around pF (seek + stand: 5.94 against 5.80 for seek and 5.61 for hunt, 960 matches)
+	"rA": func(p *Params) { seek3(p); stand(p); p.EngageRatio = 0.3 },
+	"rB": func(p *Params) { seek3(p); stand(p); p.HuntHP, p.SeekHP = 0.3, 0.3 },
+	"rC": func(p *Params) { seek3(p); stand(p); p.DisengageRat = 0 },
+	"rD": func(p *Params) {
+		seek3(p)
+		stand(p)
+		p.EngageRatio, p.HuntHP, p.SeekHP, p.DisengageRat = 0.3, 0.3, 0.3, 0
+	},
+	"rE": func(p *Params) { seek3(p); stand(p); p.KillFocus = 4 },
+	"rF": func(p *Params) { seek3(p); stand(p); p.Seek, p.SeekRange = 60, 450 },
+	"rG": func(p *Params) { seek3(p); stand(p); p.GunMaxRange = 280 },
+	"rH": func(p *Params) { seek3(p); stand(p); p.LootRadius = 120 },
+	"rI": func(p *Params) { seek3(p); stand(p); p.LootRadius = 50 },
+	"rK": func(p *Params) { seek3(p); stand(p); p.UpOffense = 0.2 },
+	"rL": func(p *Params) { seek3(p); stand(p); p.HuntRange, p.HuntRangeLaser = 300, 320 },
+	"rM": func(p *Params) { seek3(p); stand(p); p.ReturnHP = 0 },
 }
 
 // stand: never retreat from the squad (it follows anyway).
