@@ -155,6 +155,13 @@ func Variants() map[string]func(p *Params) {
 		"sq-hunt":  func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200 },
 		"sq-c10":   func(p *Params) { p.WantCubes = 10 },
 		"sq-offst": func(p *Params) { p.UpOffense = 0.2; p.DuelDisengage = 0; p.LeaveTTD = 0; p.RetreatHP = 0 },
+		"sq-kill": func(p *Params) {
+			p.KillFocus, p.UpOffense, p.WantCubes = 4, 0.2, 10
+			p.DuelDisengage, p.LeaveTTD, p.RetreatHP = 0, 0, 0
+		},
+		"x-kill":   func(p *Params) { pfx(p); p.SquadSet = "sq-kill" },
+		"sq-focus": func(p *Params) { p.KillFocus = 4 },
+		"x-focus":  func(p *Params) { pfx(p); p.SquadSet = "sq-focus" },
 		"x-off":    func(p *Params) { pfx(p); p.SquadSet = "sq-off" },
 		"x-stand":  func(p *Params) { pfx(p); p.SquadSet = "sq-stand" },
 		"x-roof":   func(p *Params) { pfx(p); p.SquadSet = "sq-roof" },

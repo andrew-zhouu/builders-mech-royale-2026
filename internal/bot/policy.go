@@ -120,7 +120,8 @@ func (b *Bot) think(act *proto.Action) {
 			s *= 1.6
 		}
 		if th.tr.MaxHP > 0 {
-			s *= 1 + (1 - th.tr.HP/th.tr.MaxHP)
+			// (KillFocus 1 is the long-standing weight; more of it goes for whoever is nearest death)
+			s *= 1 + b.P.KillFocus*(1-th.tr.HP/th.tr.MaxHP)
 		}
 		if th.tr.ID == b.targetID {
 			s *= 1.2

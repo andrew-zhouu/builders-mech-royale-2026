@@ -43,6 +43,7 @@ type Params struct {
 	NpcGiveUp     float64 // the same for a drone we are trying to shoot
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
+	KillFocus     float64 // how much a target's lost health counts when choosing whom to shoot (1 = as always)
 	HuntAfter     float64 // no fights of our own starting before this match time (0 = from the start)
 	NoMortarHard  bool    // never pick up a mortar, whatever hit model is in force (for the v0.5 set used inside a free-for-all)
 	SoundFFA      int     // NEVER USE (official practice 5.75 with it): gun shots from two directions in the opening taken as a free-for-all
@@ -157,7 +158,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "x-stand"
+var BuildVariant = "x-kill"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -186,6 +187,7 @@ func baseParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
+		KillFocus:     1,
 		Salt:          0,
 		QuietSlip:     true, // do not start it with a mech that has not touched us, unless we hold a laser and it does not
 		QuietSlipMin:  40,
