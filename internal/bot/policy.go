@@ -261,7 +261,7 @@ func (b *Bot) think(act *proto.Action) {
 				// StealthQuiet: being looked at is not being attacked. (Real matches of the build with
 				// this stance after detection: of four deaths inside a minute, two came out of fights we
 				// opened on a mech that had only turned our way, at 100 m, with a third mech arriving.)
-				if b.P.StealthQuiet && wantFight && tgt.d > 40 && b.t-tgt.tr.HurtMeT > 4 && b.t-b.lastWeaponDT > 2.5 &&
+				if b.P.StealthQuiet && wantFight && tgt.d > 40 && b.t-tgt.tr.HurtMeT > b.P.HostileMem && b.t-b.lastWeaponDT > 2.5 &&
 					!(tgt.tr.Laser && tgt.tr.Charging && b.t-tgt.tr.AimAtMeT < 0.6) && !b.laserEdge(tgt.tr) {
 					wantFight = false
 					unprovoked = true
@@ -269,7 +269,7 @@ func (b *Bot) think(act *proto.Action) {
 			case st.avoid:
 				// Free-for-all: an exchange at range without an edge is a coin flip that leaves even
 				// the winner weak, and being looked at is not being attacked.
-				hostile := b.t-tgt.tr.HurtMeT < 4 ||
+				hostile := b.t-tgt.tr.HurtMeT < b.P.HostileMem ||
 					(tgt.tr.Laser && tgt.tr.Charging && b.t-tgt.tr.AimAtMeT < 0.4) ||
 					// a laser pointed our way is a third of our health about to go: do not wait for it
 					(b.P.LaserPreempt && tgt.tr.Laser && tgt.tr.LOS && b.t-tgt.tr.AimAtMeT < 0.6)
@@ -617,7 +617,7 @@ func (b *Bot) think(act *proto.Action) {
 		// laser that had not touched us, we shot at it while walking to cover, with no laser of our
 		// own; it turned round and we were dead five seconds later. In the real matches the one who
 		// fires first on a laser holder without holding one finishes 2.2 points behind.)
-		if b.P.QuietSlip && tgt != nil && b.t-tgt.tr.HurtMeT > 4 && b.t-b.lastWeaponDT > 2.5 &&
+		if b.P.QuietSlip && tgt != nil && b.t-tgt.tr.HurtMeT > b.P.HostileMem && b.t-b.lastWeaponDT > 2.5 &&
 			!(tgt.tr.Laser && tgt.tr.Charging && b.t-tgt.tr.AimAtMeT < 0.6) && !b.laserEdge(tgt.tr) && tgt.d > b.P.QuietSlipMin {
 			holdFire = true
 			if b.mode == "slip" {

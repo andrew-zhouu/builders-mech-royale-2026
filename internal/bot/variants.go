@@ -154,6 +154,23 @@ func Variants() map[string]func(p *Params) {
 			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
 		},
 		"p74q": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq", "ffa-fixrf", 50 },
+		// ... and with a memory for who has hurt us. (A real match: a mech that had shot us five seconds
+		// earlier walked back from 86 m to lightning range while we held fire, the four-second window
+		// having made it a bystander again.)
+		"v05fixq2": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem = 30
+		},
+		"ffa-fixrf2": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem = 30
+		},
+		"p74q2":   func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq2", "ffa-fixrf2", 50 },
+		"o-quiet3": func(p *Params) { p.QuietSlip, p.QuietSlipMin, p.HostileMem = true, 40, 30 },
+		"gp-c71":   func(p *Params) { pfx(p); p.SlotPlan = "hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0" },
 		// Practice experiments: v0.7.4 for the first 24 s, the v0.13 play (no mortars) in a free-for-all,
 		// and a different practice stance each. Only the official score can judge them; whatever they
 		// score, free-for-all play is the same in all of them.
@@ -454,9 +471,10 @@ func v05(p *Params) {
 // v0.13 play without mortars.
 func pfx(p *Params) {
 	v074(p)
-	// (from v0.67 on the quiet phase after detection also holds its fire until touched: v05fixq.
+	// (from v0.67 on the quiet phase after detection also holds its fire until touched: v05fixq; from
+	// v0.96 on a mech that has hurt us stays an attacker for 30 s instead of 4: v05fixq2, ffa-fixrf2.
 	// Free-for-all play only: practice never gets there, so practice scores are as before.)
-	p.FFASwap, p.FFALate, p.FFALateT = "v05fixq", "ffa-fixrf", 50
+	p.FFASwap, p.FFALate, p.FFALateT = "v05fixq2", "ffa-fixrf2", 50
 }
 
 // v074 restores the parameters of the published v0.7.4.
