@@ -44,6 +44,8 @@ type Params struct {
 	NpcGiveUp     float64 // the same for a drone we are trying to shoot
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
+	ShyOpen       bool    // the shy opening rule (ShySecs) also while the lobby is not known yet
+	StealthQuiet  bool    // stealth stances: do not open fire on a mech that has only turned our way (hold fire until touched)
 	HuntHP        float64 // only start a hunt above this fraction of our health
 	Seek          float64 // practice stance: with nothing to pick up, go after the nearest mech seen in the last Seek seconds, else look around (0 = wait in a hide, as before)
 	SeekRange     float64 // ... no farther away than this
@@ -165,7 +167,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gp:hunt.0,hunt.0,hunt.0,hunt+quiet.2"
+var BuildVariant = "gp:hunt+quiet.0,hunt.0,hunt.0,hunt+quiet.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -500,6 +502,7 @@ type Bot struct {
 	lateDone    bool    // FFALate has been applied
 	pFFABase    Params  // the parameters FFASwap was applied to (FFALate starts from them again)
 	swapped     bool    // FFASwap has been applied
+	ffLogged    bool            // (MECH_STATS) the first-fire line has been written
 	seekBan     map[int]float64 // Seek: mechs that were not where we last saw them, and until when to forget them
 	forThem     bool    // dpsOf is being asked about an opponent's weapons
 	healing     bool    // HealFirst: hurt and letting the health come back before farming again
@@ -689,6 +692,12 @@ var Trace = os.Getenv("MECH_TRACE") != ""
 
 // Stats (MECH_STATS=1) logs a one-line snapshot every 30 s of match time, for aggregate analysis.
 var Stats = os.Getenv("MECH_STATS") != ""
+
+// logFirstFire (MECH_STATS) writes what made us pull the trigger on a mech that had not touched us.
+func (b *Bot) logFirstFire(st stance, tgt *threat, wantFight, slip bool) {
+	fmt.Fprintf(os.Stderr, "[firstfire] t=%.1f stance=%s mode=%s d=%.0f engaged=%v wantFight=%v retreating=%v slip=%v adv=%.2f laserEdge=%v itsLaser=%v aimAtMe=%.1f ffa=%v\n",
+		b.t, st.name, b.mode, tgt.d, tgt.engaged, wantFight, b.retreating, slip, tgt.adv, b.laserEdge(tgt.tr), tgt.tr.Laser, b.t-tgt.tr.AimAtMeT, b.ffa)
+}
 
 func (b *Bot) trace(act *proto.Action) {
 	if b.modeLabel == b.lastLabel && b.t-b.lastTraceT < 5 {

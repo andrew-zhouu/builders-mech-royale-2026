@@ -2,7 +2,7 @@ package bot
 
 // Variants are named parameter tweaks for A/B runs in the local arena (roster names).
 func Variants() map[string]func(p *Params) {
-	return map[string]func(p *Params){
+	m := map[string]func(p *Params){
 		// the published v0.5 behaviour (stealth in free-for-alls, hit rates as believed then)
 		"v05": func(p *Params) { v05(p) },
 		// v0.5 plus the visibility-map hideouts tried on Saturday morning
@@ -148,6 +148,12 @@ func Variants() map[string]func(p *Params) {
 		// p74f = p74d without mortars in the quiet phase (a laser hit does 60% more to a mortar carrier)
 		"v05fixnm": func(p *Params) { v05(p); p.PathFix = true; p.CreditFix = true; p.NoMortarHard = true },
 		"p74f":     func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixnm", "ffa-fixrf", 50 },
+		// the quiet phase after detection, holding fire until touched as well
+		"v05fixq": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+		},
+		"p74q": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq", "ffa-fixrf", 50 },
 		// Practice experiments: v0.7.4 for the first 24 s, the v0.13 play (no mortars) in a free-for-all,
 		// and a different practice stance each. Only the official score can judge them; whatever they
 		// score, free-for-all play is the same in all of them.
@@ -176,10 +182,32 @@ func Variants() map[string]func(p *Params) {
 		// cases it had hit that mech first; three of its seven deaths inside a minute began that way.
 		"o-quiet":  func(p *Params) { p.QuietSlip, p.QuietSlipMin = true, 40 },
 		"o-quiet2": func(p *Params) { p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly = true, 40, true },
+		// o-shy: hold fire, and position before loot: while a mech we know of can see us, only loot that
+		// is out of its sight and no nearer to it, else out of its sight first (the rule of the shy phase
+		// after detection, here from the first second). o-shy12: the same for the first 12 s only.
+		"o-shy": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin = true, 40
+			p.ShyOpen, p.ShySecs, p.ShyRange, p.ShyLaser, p.ShyMem, p.ShyBoost = true, 24, 220, 60, 6, 40
+		},
+		"o-shy12": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin = true, 40
+			p.ShyOpen, p.ShySecs, p.ShyRange, p.ShyLaser, p.ShyMem, p.ShyBoost = true, 12, 220, 60, 6, 40
+		},
+		// (emulation only) how much of the practice score hangs on the length of the "lobby not known" phase
+		"x-ho0":     func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSecs = 0 },
+		"x-ho8":     func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSecs = 8 },
+		"x-ho16":    func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSecs = 16 },
+		"x-ho40":    func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSecs = 40 },
+		"x-hunts":   func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-shy" },
+		"x-hunts12": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-shy12" },
 		"x-huntq":  func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet" },
 		"x-huntq2": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet2" },
 		"x-hunt7q": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt7"; p.OpenSet = "o-quiet" },
 		"gp-hq":    func(p *Params) { pfx(p); p.SlotPlan = "hunt+quiet.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.0" },
+		// the plans of v0.55, v0.58 and of their composite v0.67, for the local identity checks
+		"gp-c55": func(p *Params) { pfx(p); p.SlotPlan = "hunt+quiet.0,hunt.0,hunt.0,hunt.0" },
+		"gp-c58": func(p *Params) { pfx(p); p.SlotPlan = "hunt.0,hunt.0,hunt.0,hunt+quiet.0" },
+		"gp-c67": func(p *Params) { pfx(p); p.SlotPlan = "hunt+quiet.0,hunt.0,hunt.0,hunt+quiet.0" },
 		"x-hunt2": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt2" },
 		"x-hunt3": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt3" },
 		"x-hunt4": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt4" },
@@ -345,6 +373,33 @@ func Variants() map[string]func(p *Params) {
 		"b-pp40":      func(p *Params) { brawl2(p); p.ProvokeRule = true; p.PlinkMaxDPS = 40 },
 		"b-pp90":      func(p *Params) { brawl2(p); p.ProvokeRule = true; p.PlinkMaxDPS = 90 },
 	}
+	// the hunting sweep: every entry is the v0.24 practice set (sq-hunt) with one more change, as a
+	// practice set "sq-<name>" and as a whole build "x-<name>"
+	for name, f := range huntSweep {
+		name, f := name, f
+		m["sq-"+name] = func(p *Params) { p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200; f(p) }
+		m["x-"+name] = func(p *Params) { pfx(p); p.SquadSet = "sq-" + name }
+	}
+	return m
+}
+
+var huntSweep = map[string]func(p *Params){
+	"hA": func(p *Params) { p.EngageRatio = 0.7 },
+	"hB": func(p *Params) { p.EngageRatio = 0.5 },
+	"hC": func(p *Params) { p.HuntRange, p.HuntRangeLaser = 230, 260 },
+	"hD": func(p *Params) { p.Seek, p.SeekHP = 30, 0.5 },
+	"hE": func(p *Params) { p.Seek, p.SeekHP = 30, 0.85 },
+	"hF": func(p *Params) { p.LootRadius = 300 },
+	"hG": func(p *Params) { p.LootRadius = 140 },
+	"hH": func(p *Params) { p.WantCubes = 21 },
+	"hI": func(p *Params) { p.HuntHP = 0.4 },
+	"hJ": func(p *Params) { p.KillFocus = 4 },
+	"hK": func(p *Params) { p.UpOffense = 0.2 },
+	"hL": func(p *Params) { p.PatientSecs = 45 },
+	"hM": func(p *Params) { p.Seek, p.WantCubes, p.HouseModel = 30, 10, true },
+	"hN": func(p *Params) { p.EngageRatio, p.Seek, p.WantCubes = 0.6, 30, 6 },
+	"hO": func(p *Params) { p.RoofInSquad = true },
+	"hP": func(p *Params) { p.KiteMin, p.KiteMax = 90, 150 },
 }
 
 // v05 restores the parameters of the published v0.5.
@@ -377,7 +432,9 @@ func v05(p *Params) {
 // v0.13 play without mortars.
 func pfx(p *Params) {
 	v074(p)
-	p.FFASwap, p.FFALate, p.FFALateT = "v05fixnm", "ffa-fixrf", 50
+	// (from v0.67 on the quiet phase after detection also holds its fire until touched: v05fixq.
+	// Free-for-all play only: practice never gets there, so practice scores are as before.)
+	p.FFASwap, p.FFALate, p.FFALateT = "v05fixq", "ffa-fixrf", 50
 }
 
 // v074 restores the parameters of the published v0.7.4.

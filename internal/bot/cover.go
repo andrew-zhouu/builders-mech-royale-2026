@@ -28,8 +28,9 @@ func (b *Bot) stuckOn(id int, hp, limit float64) bool {
 // shyPhase reports whether the opening rule applies: the first ShySecs of a match in a free-for-all
 // stance (see think for what it does and why).
 func (b *Bot) shyPhase(st stance) bool {
-	// (only once we know it is a free-for-all: against the practice squad it costs kills)
-	return b.P.ShySecs > 0 && b.ffa && st.avoid && b.t < b.P.ShySecs
+	// (only once we know it is a free-for-all: against the practice squad it costs kills; ShyOpen
+	// lets an opening set try it while the lobby is not known yet)
+	return b.P.ShySecs > 0 && (b.ffa || (b.P.ShyOpen && st.name == "open")) && st.avoid && b.t < b.P.ShySecs
 }
 
 // exposedTo reports whether a mech we saw in the last secs seconds, no farther than maxRange from us,

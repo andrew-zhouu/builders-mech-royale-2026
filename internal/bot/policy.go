@@ -258,6 +258,14 @@ func (b *Bot) think(act *proto.Action) {
 				if tgt.d < b.P.StealthFightRange || tgt.adv >= st.engageRatio {
 					wantFight = true
 				}
+				// StealthQuiet: being looked at is not being attacked. (Real matches of the build with
+				// this stance after detection: of four deaths inside a minute, two came out of fights we
+				// opened on a mech that had only turned our way, at 100 m, with a third mech arriving.)
+				if b.P.StealthQuiet && wantFight && tgt.d > 40 && b.t-tgt.tr.HurtMeT > 4 && b.t-b.lastWeaponDT > 2.5 &&
+					!(tgt.tr.Laser && tgt.tr.Charging && b.t-tgt.tr.AimAtMeT < 0.6) && !b.laserEdge(tgt.tr) {
+					wantFight = false
+					unprovoked = true
+				}
 			case st.avoid:
 				// Free-for-all: an exchange at range without an edge is a coin flip that leaves even
 				// the winner weak, and being looked at is not being attacked.
@@ -999,6 +1007,11 @@ func (b *Bot) think(act *proto.Action) {
 		b.engage(act, at, tgt.tr.LOS, b.t-tgt.tr.LOST < 0.8, tgt.tr.HP, true)
 		if peekCharge && peekLi >= 0 {
 			act.Fire[peekLi] = true // charging needs no line of sight
+		}
+		if Stats && !b.ffLogged && (act.Fire[0] || act.Fire[1]) && tgt.tr.HurtMeT < 0 && b.t < 40 {
+			// (local analysis only) the first time we pull the trigger on a mech that has not touched us
+			b.ffLogged = true
+			b.logFirstFire(st, tgt, wantFight, slip)
 		}
 	case shootItem != nil:
 		b.engage(act, *shootItem, true, true, shootHP, true)
