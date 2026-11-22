@@ -441,8 +441,20 @@ func (b *Bot) think(act *proto.Action) {
 	peekCharge := false  // peek fight: start charging the laser now, out of sight
 	direct := false     // the action's movement was written directly (jet climb): skip the ground planner
 	// jetting up a wall in someone's sights is how we died in our first real match
-	b.holdClimb = st.avoid && (len(watchers) > 0 || underFire)
-	if st.avoid && !b.holdClimb {
+	// (ClimbCheckAll: the same care in the stealth stances. A real match: 30 m up a wall at 21 s, two
+	// mechs within 110 m, dead at 26 s without having touched the roof.)
+	climbCare := st.avoid || b.P.ClimbCheckAll
+	b.holdClimb = climbCare && (len(watchers) > 0 || underFire)
+	if climbCare && !b.holdClimb && b.P.ClimbClearMem > 0 {
+		// ... and anyone seen in the last few seconds inside the range, in view or not
+		for _, tr := range b.tracks {
+			if !tr.NPC && b.t-tr.LastSeen <= b.P.ClimbClearMem && dist2(b.pos, tr.Pos) < b.P.ClimbClearRange {
+				b.holdClimb = true
+				break
+			}
+		}
+	}
+	if climbCare && !b.holdClimb {
 		// ... nor with anyone in plain sight inside 150 m, whichever way it happens to be looking
 		for i := range ths {
 			if ths[i].tr.Listed && ths[i].tr.LOS && ths[i].d < b.P.ClimbClearRange {

@@ -231,6 +231,33 @@ func Variants() map[string]func(p *Params) {
 			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
 		},
 		"p74q7": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq7", "ffa-fixrf7", 50 },
+		"v05fixq8": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand, p.EdgeClamp = 30, true, 3, 0.75, true
+		},
+		"ffa-fixrf8": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand, p.EdgeClamp = 30, true, 3, 0.75, true
+		},
+		"p74q8": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq8", "ffa-fixrf8", 50 },
+		// q9 = q7 + care before a climb in the quiet phase as well, and for mechs seen in the last 4 s
+		"v05fixq9": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+		},
+		"ffa-fixrf9": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+		},
+		"p74q9": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq9", "ffa-fixrf9", 50 },
 		"o-quiet3": func(p *Params) { p.QuietSlip, p.QuietSlipMin, p.HostileMem = true, 40, 30 },
 		// o-roof: the v0.5 opening (stealth: a weapon close by, then a roof, out of sight), holding fire
 		// until touched. In the real matches v0.5 died inside a minute in 2 of 24 (10 AM to 1 PM) where
@@ -554,7 +581,9 @@ func pfx(p *Params) {
 	// From v0.104 on: v05fixq3, ffa-fixrf3 (a hurt mech also shoots the drone that is plinking at it).
 	// From v0.119 on: v05fixq7, ffa-fixrf7 (and stays out towards the edge of the next circle, away from
 	// the others: EdgeBias 3, EdgeBand 0.75).
-	p.FFASwap, p.FFALate, p.FFALateT = "v05fixq7", "ffa-fixrf7", 50
+	// From v0.123 on: v05fixq9, ffa-fixrf9 (and no climb with a mech seen inside 170 m in the last 4 s,
+	// in the quiet phase as well).
+	p.FFASwap, p.FFALate, p.FFALateT = "v05fixq9", "ffa-fixrf9", 50
 }
 
 // v074 restores the parameters of the published v0.7.4.

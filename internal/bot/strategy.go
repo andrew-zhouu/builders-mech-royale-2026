@@ -438,7 +438,16 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 					dm = de
 				}
 			}
-			value *= 1 - b.P.EdgeBias*0.6*(1-dm/120)
+			if b.P.EdgeClamp {
+				// (later builds: nothing at all right beside a mech, and never a negative worth)
+				f := 1 - b.P.EdgeBias*0.6*(1-dm/120)
+				if f < 0.05 {
+					return
+				}
+				value *= f
+			} else {
+				value *= 1 - b.P.EdgeBias*0.6*(1-dm/120)
+			}
 		}
 		if len(awayFrom) > 0 {
 			laserClose := false
