@@ -393,10 +393,40 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 			}
 		}
 	}
+	// OpenAway (opening sets): errands that take us towards a mech we know of are worth less. In the real
+	// matches mechs that began with one 100-150 m off and got 15 m+ closer in the first 10 s were dead
+	// inside a minute 47% of the time (6.0 points); those that kept the distance 26% (7.6); those that
+	// opened it 15% (8.6). Nothing is forbidden (the stricter "shy" rule costs kills in practice).
+	var awayFrom [][3]float64
+	if b.P.OpenAway > 0 && st.name == "open" {
+		for _, tr := range b.tracks {
+			if tr.NPC || b.t-tr.LastSeen > 6 || dist2(b.pos, tr.Pos) > 220 {
+				continue
+			}
+			awayFrom = append(awayFrom, tr.Pos)
+		}
+	}
 	consider := func(l loot, value, handling float64) {
 		d := dist2(b.pos, l.pos)
 		if d > st.lootRadius {
 			return
+		}
+		if len(awayFrom) > 0 {
+			laserClose := false
+			if l.kind == "pickup" && b.has("laser") < 0 && d < 60 {
+				if it := b.pickups[l.id]; it != nil && it.Kind == "laser" {
+					laserClose = true
+				}
+			}
+			if !laserClose {
+				for _, e := range awayFrom {
+					de := hyp(e[0]-l.pos[0], e[1]-l.pos[1])
+					if de < 150 && de < hyp(e[0]-b.pos[0], e[1]-b.pos[1])-15 {
+						value *= 1 - b.P.OpenAway
+						break
+					}
+				}
+			}
 		}
 		if until, banned := b.banUntil[l.id]; banned && b.t < until {
 			return

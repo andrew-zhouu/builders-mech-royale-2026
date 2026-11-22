@@ -198,6 +198,11 @@ func Variants() map[string]func(p *Params) {
 		"x-ho8":     func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSecs = 8 },
 		"x-ho16":    func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSecs = 16 },
 		"x-ho40":    func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSecs = 40 },
+		// o-far: hold fire, and prefer errands that do not take us towards a mech we know of
+		"o-far":     func(p *Params) { p.QuietSlip, p.QuietSlipMin, p.OpenAway = true, 40, 0.6 },
+		"o-far9":    func(p *Params) { p.QuietSlip, p.QuietSlipMin, p.OpenAway = true, 40, 0.9 },
+		"x-huntf":   func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-far" },
+		"x-huntf9":  func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-far9" },
 		"x-hunts":   func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-shy" },
 		"x-hunts12": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-shy12" },
 		"x-huntq":  func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet" },
@@ -398,6 +403,17 @@ var huntSweep = map[string]func(p *Params){
 	"hL": func(p *Params) { p.PatientSecs = 45 },
 	"hM": func(p *Params) { p.Seek, p.WantCubes, p.HouseModel = 30, 10, true },
 	"hN": func(p *Params) { p.EngageRatio, p.Seek, p.WantCubes = 0.6, 30, 6 },
+	// second round, around hN (the best of the first: +0.12): less farming, more seeking
+	"hN2": func(p *Params) { p.EngageRatio, p.Seek, p.WantCubes = 0.6, 30, 3 },
+	"hN3": func(p *Params) { p.EngageRatio, p.Seek, p.WantCubes = 0.6, 30, 0 },
+	"hN4": func(p *Params) { p.Seek, p.WantCubes = 30, 6 },
+	"hN5": func(p *Params) { p.EngageRatio, p.Seek, p.WantCubes, p.SeekHP = 0.6, 60, 6, 0.5 },
+	"hN6": func(p *Params) { p.EngageRatio, p.Seek, p.WantCubes, p.SeekHP, p.HuntHP = 0.6, 30, 6, 0.5, 0.4 },
+	"hN7": func(p *Params) {
+		p.EngageRatio, p.Seek, p.WantCubes = 0.6, 30, 6
+		p.HuntRange, p.HuntRangeLaser = 230, 260
+	},
+	"hN8": func(p *Params) { p.EngageRatio, p.Seek, p.WantCubes, p.HouseModel = 0.6, 30, 6, true },
 	"hO": func(p *Params) { p.RoofInSquad = true },
 	"hP": func(p *Params) { p.KiteMin, p.KiteMax = 90, 150 },
 }
