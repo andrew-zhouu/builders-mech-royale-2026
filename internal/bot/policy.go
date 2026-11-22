@@ -147,6 +147,14 @@ func (b *Bot) think(act *proto.Action) {
 		b.targetID = -1
 	}
 	watchers := b.seenBy(ths, 230)
+	if b.P.LaserSprint {
+		// (a laser reaches 280 m: two of our deaths in the showdown after the reset came from 197 and 234 m)
+		for i := range ths {
+			if th := &ths[i]; th.tr.LOS && th.tr.Listed && th.tr.Laser && th.d >= 230 && th.d < 285 {
+				watchers = append(watchers, th)
+			}
+		}
+	}
 
 	// --- fight or flight
 	underFire := b.t-b.lastWeaponDT < 3.0
@@ -836,9 +844,20 @@ func (b *Bot) think(act *proto.Action) {
 			b.evadeCell = b.findCover(ths, 110)
 			b.evadeT = b.t
 		}
+		// (LaserRespect: in the sight of a laser that is charging, or of any laser while we hold none,
+		// the walk to cover is a sprint: a full charge takes 0.75 s and there is no dodging the beam)
+		sprint := false
+		if b.P.LaserSprint && b.energy > 25 {
+			for _, w := range watchers {
+				if w.tr.Laser && w.d > 25 && (w.tr.Charging || b.has("laser") < 0) {
+					sprint = true
+					break
+				}
+			}
+		}
 		if b.evadeCell >= 0 {
 			cx, cy := b.Nav.Pos(b.evadeCell)
-			if d := setGoal(cx, cy, 2.2, false); d < 0.9 || (d < 3.0 && b.hiddenHere(ths)) {
+			if d := setGoal(cx, cy, 2.2, sprint); d < 0.9 || (d < 3.0 && b.hiddenHere(ths)) {
 				rq.wantW = 0
 				rq.hold = true
 			}

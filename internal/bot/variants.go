@@ -258,6 +258,41 @@ func Variants() map[string]func(p *Params) {
 			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
 		},
 		"p74q9": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq9", "ffa-fixrf9", 50 },
+		// rf9n = rf9 without the pull towards the edge of the circle (EdgeBias, EdgeBand). That pull went
+		// in with v0.119 on a correlation (the best survivors stand far out) and no real test; v0.119's
+		// own real record is our worst: 197 m from its spawn at 45 s against 144 m for the builds before
+		// it, and a death rate on the ground 3.7 times the field's (showdown after the reset).
+		"ffa-fixrf9n": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest = 30, true
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+		},
+		// "statue" sets: next to nothing but waiting. s1: reach 25 m; s2: reach 40 m; s3: reach 25 m and
+		// no shooting at crates or drones; s4: reach 80 m (as k13) and no such shooting.
+		"v05fixs1": func(p *Params) { statue(p, 25, false) },
+		"v05fixs2": func(p *Params) { statue(p, 40, false) },
+		"v05fixs3": func(p *Params) { statue(p, 25, true) },
+		"v05fixs4": func(p *Params) { statue(p, 80, true) },
+		"x-g0s1":   func(p *Params) { gateTest(p, "v05fixs1", 300); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
+		"x-g0s2":   func(p *Params) { gateTest(p, "v05fixs2", 300); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
+		"x-g0s3":   func(p *Params) { gateTest(p, "v05fixs3", 300); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
+		"x-g0s4":   func(p *Params) { gateTest(p, "v05fixs4", 300); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
+		"x-g0k13n":   func(p *Params) { gateTest(p, "v05fixk13", 60); p.FFALate = "ffa-fixrf9n" },
+		"x-g0k13na4": func(p *Params) { gateTest(p, "v05fixk13", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
+		"gg-c4": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", 1795363200
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk13", "ffa-fixrf9n", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		"gg-open4": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", nowUnix()-60
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk13", "ffa-fixrf9n", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
 		// The other way to play the first minute of a known free-for-all: no stealth phase; arm and farm
 		// at once, holding fire until touched, out towards the edge and away from the others (the brawl
 		// stance of ffa-fixrf9, the roof only once armed for it). In the real matches the stealth phase
@@ -328,6 +363,28 @@ func Variants() map[string]func(p *Params) {
 		// score, free-for-all play is the same in all of them.
 		"sq-roof":  func(p *Params) { p.RoofInSquad = true },
 		"sq-hunt":  func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200 },
+		// Sustain (practice): in the emulated matches we take about one health bar of damage in all
+		// before we die (dealt to taken about 5 to 1): the health never comes back, because between
+		// kills we shoot crates and drones or go looking for the next fight, and either stops the
+		// regeneration (45 a second after 5 s of neither dealing nor taking damage). heal1: hurt and
+		// left alone, no crates or drones until healed. heal2: and no fight of our own choosing below
+		// 85% health. heal3: the seek variant with both.
+		"sq-heal1": func(p *Params) {
+			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200
+			p.HealFirst, p.HealUntil = 0.8, 0.97
+		},
+		"sq-heal2": func(p *Params) {
+			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200
+			p.HealFirst, p.HealUntil, p.HuntHP = 0.9, 0.98, 0.85
+		},
+		"sq-heal3": func(p *Params) {
+			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.6, 180, 200
+			p.Seek, p.WantCubes = 30, 3
+			p.HealFirst, p.HealUntil, p.HuntHP, p.SeekHP = 0.9, 0.98, 0.85, 0.9
+		},
+		"x-heal1": func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-heal1", "o-quiet3" },
+		"x-heal2": func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-heal2", "o-quiet3" },
+		"x-heal3": func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-heal3", "o-quiet3" },
 		// v0.24 (sq-hunt) scored 6.29, our best: more of the same, in two directions and both together
 		// hunt2 = hunts at longer range, on thinner odds and with less health in hand
 		"sq-hunt2": func(p *Params) { p.EngageRatio = 0.7; p.HuntRange = 220; p.HuntRangeLaser = 250; p.HuntHP = 0.5 },
@@ -468,6 +525,15 @@ func Variants() map[string]func(p *Params) {
 			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk13", "ffa-fixrf9", 60, gateDoubtS
 			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
 		},
+		// k14 = k13 + a sprint to cover when a laser holder can see us (LaserSprint)
+		"v05fixk14": func(p *Params) {
+			bunker(p, 80, 0.5)
+			p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20
+			p.DropStick = true
+			p.LaserRespect, p.ThreatMem, p.LaserSprint = 60, 30, true
+		},
+		"x-g0k14":   func(p *Params) { gateTest(p, "v05fixk14", 60) },
+		"x-g0k14a4": func(p *Params) { gateTest(p, "v05fixk14", 240); p.FFALateAlive = 4 },
 		"x-g0k13":   func(p *Params) { gateTest(p, "v05fixk13", 60) },
 		"x-g0k13a4": func(p *Params) { gateTest(p, "v05fixk13", 240); p.FFALateAlive = 4 },
 		"x-g0k12":   func(p *Params) { gateTest(p, "v05fixk12", 60) },
@@ -812,6 +878,16 @@ func quietGround(p *Params) {
 	p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
 	p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
 	p.UseRoofs, p.NoStealthRoam = false, true
+}
+
+// statue is the keep-away set (bunker with KeepAway, the laser rules, DropStick) with the given reach
+// for loot and weapons, and optionally no shooting at crates or drones.
+func statue(p *Params, reach float64, noFarm bool) {
+	bunker(p, reach, 0.5)
+	p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20
+	p.DropStick = true
+	p.LaserRespect, p.ThreatMem = 60, 30
+	p.NoFarm = noFarm
 }
 
 // gateTest is a build whose gate is open: a free-for-all from the first tick, with swap as the quiet

@@ -601,11 +601,11 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 		}
 		for _, it := range b.crates {
 			// roof crates can still be shot from the ground, but the cube stays up there: skip them
-			if it.Ground && !noShoot {
+			if it.Ground && !noShoot && !b.P.NoFarm {
 				consider(loot{kind: "crate", id: it.ID, pos: it.Pos, shoot: true}, 7, 2.5)
 			}
 		}
-		if !danger && !noShoot {
+		if !danger && !noShoot && !b.P.NoFarm {
 			for _, tr := range b.tracks {
 				if tr.NPC && b.t-tr.LastSeen < 20 {
 					k := b.Nav.Index(tr.Pos[0], tr.Pos[1])

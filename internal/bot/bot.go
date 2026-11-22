@@ -53,6 +53,11 @@ type Params struct {
 	KeepAwayStay  float64 // ... and the place we already hold is this much better than its score says
 	LaserRespect  float64 // stealth stances: hit by a laser from beyond this range with none of our own, break its line of sight at once (0 = off)
 	ThreatMem     float64 // a mech that hurt us counts as watching from where we last saw it for this long (hide and loot choice; 0 = off)
+	LaserSprint   bool    // stealth stances: seen by a laser holder (out to 285 m) while it charges or we hold none, sprint to cover
+	// NoFarm: no shooting at crates or drones for loot (a gun is heard 320 m away). Real matches, all
+	// teams: a mech that stands still and has not fired for 5 s is attacked 0.27 times per 100 s; the
+	// field as a whole dies 0.87 times per 100 s on the ground, and our own builds since the reset 3.2.
+	NoFarm bool
 	ClimbCheckAll bool    // the no-climb-in-someone's-sight rules in every stance, not only the brawl stances
 	ClimbClearMem float64 // ... counting mechs seen in the last this many seconds inside ClimbClearRange (0 = only those in view now)
 	EdgeBias      float64 // free-for-all sets: prefer hideouts, roofs and loot out towards the edge of the next circle and away from known mechs (0 = off)
@@ -210,7 +215,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gg:1795363200:v05fixk13:ffa-fixrf9:60x240a4:hunt+quiet3.3"
+var BuildVariant = "gg:1795341600:v05fixk13:ffa-fixrf9n:60x240a4:hunt+quiet3.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
