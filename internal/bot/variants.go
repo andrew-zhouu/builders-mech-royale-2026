@@ -361,6 +361,55 @@ func Variants() map[string]func(p *Params) {
 		"v05fixk28": func(p *Params) { keepAway20(p); p.StealthCoverFirst = 45 },
 		"v05fixk29": func(p *Params) { keepAway20(p); p.StealthCoverFirst, p.FFAEngage = 45, 99 },
 		// (the same with the seek practice stance of v0.136, for the identity check against it)
+		// Around the published keep-away set (k29), for the re-enactment with calibrated gun hits (-guncal):
+		// when to leave it (2, 3, 6 left; never before 330 s), shorter reach, no shooting for loot.
+		"v05fixk29r40": func(p *Params) { keepAway29(p); p.ArmRadius, p.FFALootRadius = 40, 40 },
+		"v05fixk29r120": func(p *Params) { keepAway29(p); p.ArmRadius, p.FFALootRadius = 120, 120 },
+		"v05fixk29nf":  func(p *Params) { keepAway29(p); p.NoFarm = true },
+		"v05fixk29r160": func(p *Params) { keepAway29(p); p.ArmRadius, p.FFALootRadius = 160, 160 },
+		"v05fixk29r200": func(p *Params) { keepAway29(p); p.ArmRadius, p.FFALootRadius = 200, 200 },
+		"v05fixk29ra":   func(p *Params) { keepAway29(p); p.ArmRadius, p.FFALootRadius = 120, 80 },
+		"v05fixk29rl":   func(p *Params) { keepAway29(p); p.ArmRadius, p.FFALootRadius = 80, 120 },
+		"x-k29r160": func(p *Params) { gateTest(p, "v05fixk29r160", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-k29r200": func(p *Params) { gateTest(p, "v05fixk29r200", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-k29ra":   func(p *Params) { gateTest(p, "v05fixk29ra", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-k29rl":   func(p *Params) { gateTest(p, "v05fixk29rl", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		// No gate: the keep-away set from the moment a free-for-all is detected, until four are left (hk29);
+		// the old quiet set without the pull to the edge, then the late set without it (hq9n).
+		"v05fixq9n": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest = 30, true
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+		},
+		"x-hk29": func(p *Params) {
+			pfx(p)
+			p.SquadSet, p.OpenSet = "sq-hunt", "o-quiet3"
+			p.FFASwap, p.FFALate, p.FFALateT, p.FFALateAlive = "v05fixk29", "ffa-fixrf9z", 240, 4
+		},
+		"x-hq9n": func(p *Params) {
+			pfx(p)
+			p.SquadSet, p.OpenSet = "sq-hunt", "o-quiet3"
+			p.FFASwap, p.FFALate, p.FFALateT = "v05fixq9n", "ffa-fixrf9z", 50
+		},
+		// k29 with the position-first rule of the shy phase for its first 20 s (cover from any mech in view
+		// before loot, at a sprint), and with it for 40 s
+		"v05fixk29s": func(p *Params) {
+			keepAway29(p)
+			p.ShySecs, p.ShyRange, p.ShyLaser, p.ShyMem, p.ShyBoost = 20, 220, 60, 6, 40
+		},
+		"v05fixk29s4": func(p *Params) {
+			keepAway29(p)
+			p.ShySecs, p.ShyRange, p.ShyLaser, p.ShyMem, p.ShyBoost = 40, 220, 60, 6, 40
+		},
+		"x-k29s":  func(p *Params) { gateTest(p, "v05fixk29s", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-k29s4": func(p *Params) { gateTest(p, "v05fixk29s4", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-k29a2":   func(p *Params) { gateTest(p, "v05fixk29", 330); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 2 },
+		"x-k29a3":   func(p *Params) { gateTest(p, "v05fixk29", 300); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 3 },
+		"x-k29a6":   func(p *Params) { gateTest(p, "v05fixk29", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 6 },
+		"x-k29r40":  func(p *Params) { gateTest(p, "v05fixk29r40", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-k29r120": func(p *Params) { gateTest(p, "v05fixk29r120", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-k29nf":   func(p *Params) { gateTest(p, "v05fixk29nf", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
 		"gg-c9": func(p *Params) {
 			pfx(p)
 			p.SlotPlan, p.FFAFrom = "hN2+quiet3.0", 1795363200
@@ -1099,6 +1148,12 @@ func keepAway20(p *Params) {
 	p.HitModel, p.PlanV2 = 1, true
 	p.LaserValue, p.LootBoost = 6, 30
 	p.ZoneSlack = 10
+}
+
+// keepAway29 is the published keep-away set k29: k20 with cover first and no fights on the estimate alone.
+func keepAway29(p *Params) {
+	keepAway20(p)
+	p.StealthCoverFirst, p.FFAEngage = 45, 99
 }
 
 // gateTest is a build whose gate is open: a free-for-all from the first tick, with swap as the quiet
