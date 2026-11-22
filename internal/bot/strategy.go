@@ -84,13 +84,20 @@ func (b *Bot) zoneInfo() zoneInfo {
 				break search
 			}
 		}
+		// ZoneGoalHold: with no way in on foot, keep the place we were already making for as long as it
+		// is still inside the same next circle. (Re-enacted: a mech on a roof whose over-the-walls goal
+		// moved every second as it moved, re-planned its route each time and walked to and fro up there
+		// for 55 s until the zone had it.)
+		keep := b.P.ZoneGoalHold && !found && !b.zgWalk && key == b.zgHoldKey &&
+			hyp(b.zgGoal[0]-z.NextCenter[0], b.zgGoal[1]-z.NextCenter[1]) <= z.NextRadius-margin
 		b.zgWalk = found
-		if !found {
+		if !found && !keep {
 			if foundAny {
 				b.zgGoal = anyGoal // standable but not on foot from here: we will go over things
 			} else {
 				b.zgGoal = [2]float64{z.NextCenter[0], z.NextCenter[1]}
 			}
+			b.zgHoldKey = key
 		}
 	}
 	zi.goal, zi.walkable = b.zgGoal, b.zgWalk

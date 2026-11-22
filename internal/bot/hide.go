@@ -156,6 +156,13 @@ func (b *Bot) chooseHide(zi zoneInfo) int {
 			}
 		}
 	}
+	// (no more than the twelve nearest: the cost of scoring every candidate cell stays bounded)
+	if len(kaPts) > 12 {
+		sort.Slice(kaPts, func(i, j int) bool {
+			return hyp(kaPts[i].x-b.pos[0], kaPts[i].y-b.pos[1]) < hyp(kaPts[j].x-b.pos[0], kaPts[j].y-b.pos[1])
+		})
+		kaPts = kaPts[:12]
+	}
 	keepAway := func(x, y float64) float64 {
 		s := 0.0
 		for _, q := range kaPts {
@@ -247,6 +254,10 @@ func (b *Bot) chooseHide(zi zoneInfo) int {
 					if hurt {
 						s += 60
 					}
+					// HideSeenCost: a place a mech can see is no hiding place, however long we have stood
+					// there. (Re-enacted: the 29 points for staying put outweighed the 30 for being seen,
+					// and the mech walked back into a watcher's view every time it had stepped out of it.)
+					s += b.P.HideSeenCost
 				}
 			}
 		}

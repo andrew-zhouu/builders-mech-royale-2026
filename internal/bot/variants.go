@@ -279,6 +279,58 @@ func Variants() map[string]func(p *Params) {
 		"x-g0s2":   func(p *Params) { gateTest(p, "v05fixs2", 300); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
 		"x-g0s3":   func(p *Params) { gateTest(p, "v05fixs3", 300); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
 		"x-g0s4":   func(p *Params) { gateTest(p, "v05fixs4", 300); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
+		// k15, rf9z = k13, rf9n with one steady goal when the way into the circle is over walls (ZoneGoalHold)
+		"v05fixk15": func(p *Params) { statue(p, 80, false); p.ZoneGoalHold = true },
+		"ffa-fixrf9z": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest = 30, true
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+			p.ZoneGoalHold = true
+		},
+		// k16 = k15 + a seen place is no hiding place (HideSeenCost)
+		"v05fixk16": func(p *Params) { statue(p, 80, false); p.ZoneGoalHold = true; p.HideSeenCost = 100 },
+		"x-g0k16":   func(p *Params) { gateTest(p, "v05fixk16", 60); p.FFALate = "ffa-fixrf9z" },
+		"x-g0k16a4": func(p *Params) { gateTest(p, "v05fixk16", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"gg-c5": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", 1795363200
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk16", "ffa-fixrf9z", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		"gg-open5": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", nowUnix()-60
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk16", "ffa-fixrf9z", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		"x-g0k15":   func(p *Params) { gateTest(p, "v05fixk15", 60); p.FFALate = "ffa-fixrf9z" },
+		"x-g0k15a4": func(p *Params) { gateTest(p, "v05fixk15", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		// k17 = k13 that goes for a supply drop only from 100 m (re-enacted, the hiding seats: top-4 50%
+		// -> 56%, mean survival 147 -> 155 s), with ZoneGoalHold
+		"v05fixk17": func(p *Params) { statue(p, 80, false); p.DropRadius = 100; p.ZoneGoalHold = true },
+		"x-g0k17":   func(p *Params) { gateTest(p, "v05fixk17", 60); p.FFALate = "ffa-fixrf9z" },
+		"x-g0k17a4": func(p *Params) { gateTest(p, "v05fixk17", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"gg-c6": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", 1795363200
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk17", "ffa-fixrf9z", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		"gg-open6": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", nowUnix()-60
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk17", "ffa-fixrf9z", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		// supply drops in the keep-away set: from 300 m as always (k13), from 100 m (k13d1), not at all (k13d0)
+		"v05fixk13d1": func(p *Params) { statue(p, 80, false); p.DropRadius = 100 },
+		"v05fixk13d0": func(p *Params) { statue(p, 80, false); p.DropRadius = 0 },
+		"x-g0k13d1a4": func(p *Params) { gateTest(p, "v05fixk13d1", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
+		"x-g0k13d0a4": func(p *Params) { gateTest(p, "v05fixk13d0", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
+		"x-g0k13d1":   func(p *Params) { gateTest(p, "v05fixk13d1", 60); p.FFALate = "ffa-fixrf9n" },
+		"x-g0k13d0":   func(p *Params) { gateTest(p, "v05fixk13d0", 60); p.FFALate = "ffa-fixrf9n" },
 		"x-g0k13n":   func(p *Params) { gateTest(p, "v05fixk13", 60); p.FFALate = "ffa-fixrf9n" },
 		"x-g0k13na4": func(p *Params) { gateTest(p, "v05fixk13", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9n", 4 },
 		"gg-c4": func(p *Params) {

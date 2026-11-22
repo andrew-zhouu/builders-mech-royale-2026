@@ -58,6 +58,8 @@ type Params struct {
 	// teams: a mech that stands still and has not fired for 5 s is attacked 0.27 times per 100 s; the
 	// field as a whole dies 0.87 times per 100 s on the ground, and our own builds since the reset 3.2.
 	NoFarm bool
+	ZoneGoalHold bool // the way into the next circle being over walls, keep one goal instead of choosing afresh every second (see zoneInfo)
+	HideSeenCost float64 // hide choice: extra cost of a place that a mech seen in the last 8 s can see (0 = the usual 30 only)
 	ClimbCheckAll bool    // the no-climb-in-someone's-sight rules in every stance, not only the brawl stances
 	ClimbClearMem float64 // ... counting mechs seen in the last this many seconds inside ClimbClearRange (0 = only those in view now)
 	EdgeBias      float64 // free-for-all sets: prefer hideouts, roofs and loot out towards the edge of the next circle and away from known mechs (0 = off)
@@ -215,7 +217,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gg:1795363200:v05fixk13:ffa-fixrf9n:60x240a4:hunt+quiet3.3"
+var BuildVariant = "gg:1795341600:v05fixk17:ffa-fixrf9z:60x240a4:hunt+quiet3.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -709,6 +711,7 @@ type Bot struct {
 	lowT        float64
 	retreatT    float64
 	corneredT   float64
+	zgHoldKey   [3]float64 // ZoneGoalHold: the circle our over-the-walls goal was chosen for
 	zgKey       [3]float64 // zone-goal cache
 	zgT         float64
 	zgComp      int32

@@ -840,6 +840,9 @@ func (b *Bot) think(act *proto.Action) {
 	case st.stealth && len(watchers) > 0 && !(onRoof && roofWanted) && b.roof.state != roofApproach:
 		// someone can see us: get out of their sight without starting anything
 		b.mode = "evade"
+		if b.P.HideSeenCost > 0 {
+			b.hideT = -100 // (and choose where to wait afresh the moment we are out of it)
+		}
 		if b.t-b.evadeT > 0.6 {
 			b.evadeCell = b.findCover(ths, 110)
 			b.evadeT = b.t
