@@ -406,10 +406,39 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 			awayFrom = append(awayFrom, tr.Pos)
 		}
 	}
+	// EdgeBias (free-for-all sets): stay out towards the edge of the next circle and away from the mechs
+	// we know of. In the real matches (4 PM to midnight Saturday) the two teams with the best
+	// free-for-all records stood at 0.6-0.7 of the zone radius from its centre at 90-120 s and 140-200 m
+	// from the nearest mech; everyone else, we included, at 0.4-0.55 and 100-135 m.
+	var edgeMechs [][3]float64
+	if b.P.EdgeBias > 0 && b.ffa {
+		for _, tr := range b.tracks {
+			if tr.NPC || b.t-tr.LastSeen > 10 {
+				continue
+			}
+			edgeMechs = append(edgeMechs, tr.Pos)
+		}
+	}
 	consider := func(l loot, value, handling float64) {
 		d := dist2(b.pos, l.pos)
 		if d > st.lootRadius {
 			return
+		}
+		if b.P.EdgeBias > 0 && b.ffa && l.kind != "drop" {
+			if z := &b.o.Zone; z.NextRadius > 60 {
+				f := hyp(l.pos[0]-z.NextCenter[0], l.pos[1]-z.NextCenter[1]) / z.NextRadius
+				value *= math.Max(0.2, 1+b.P.EdgeBias*0.6*(clamp(f, 0, 1.1)-0.5))
+				if b.P.EdgeBand > 0 && f < b.P.EdgeBand {
+					value *= 0.4
+				}
+			}
+			dm := 120.0
+			for _, e := range edgeMechs {
+				if de := hyp(e[0]-l.pos[0], e[1]-l.pos[1]); de < dm {
+					dm = de
+				}
+			}
+			value *= 1 - b.P.EdgeBias*0.6*(1-dm/120)
 		}
 		if len(awayFrom) > 0 {
 			laserClose := false

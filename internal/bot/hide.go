@@ -152,6 +152,14 @@ func (b *Bot) chooseHide(zi zoneInfo) int {
 			if z.NextRadius > 60 && dn < z.NextRadius*0.35 {
 				s += 10
 			}
+			// EdgeBias: out towards the edge of the next circle (see the loot chooser); EdgeBand: nothing
+			// nearer the middle than this share of its radius
+			if b.P.EdgeBias > 0 && z.NextRadius > 60 {
+				s -= b.P.EdgeBias * 30 * dn / z.NextRadius
+				if b.P.EdgeBand > 0 && dn < z.NextRadius*b.P.EdgeBand {
+					s += 60
+				}
+			}
 			// prefer being close to a wall (something to duck behind)
 			s += float64(b.Nav.Clear[k]) * 0.8
 			if k == b.holdCell {

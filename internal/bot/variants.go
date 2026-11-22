@@ -182,6 +182,55 @@ func Variants() map[string]func(p *Params) {
 			p.HostileMem, p.RetreatPest = 30, true
 		},
 		"p74q3": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq3", "ffa-fixrf3", 50 },
+		// ... and out towards the edge of the circle, away from the others (EdgeBias)
+		"v05fixq4": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias = 30, true, 1
+		},
+		"ffa-fixrf4": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest, p.EdgeBias = 30, true, 1
+		},
+		"p74q4": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq4", "ffa-fixrf4", 50 },
+		"v05fixq5": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias = 30, true, 2
+		},
+		"ffa-fixrf5": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest, p.EdgeBias = 30, true, 2
+		},
+		"p74q5": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq5", "ffa-fixrf5", 50 },
+		"v05fixq6": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 2, 0.6
+		},
+		"ffa-fixrf6": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 2, 0.6
+		},
+		"p74q6": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq6", "ffa-fixrf6", 50 },
+		"v05fixq7": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+		},
+		"ffa-fixrf7": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+		},
+		"p74q7": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq7", "ffa-fixrf7", 50 },
 		"o-quiet3": func(p *Params) { p.QuietSlip, p.QuietSlipMin, p.HostileMem = true, 40, 30 },
 		// o-roof: the v0.5 opening (stealth: a weapon close by, then a roof, out of sight), holding fire
 		// until touched. In the real matches v0.5 died inside a minute in 2 of 24 (10 AM to 1 PM) where
@@ -195,6 +244,10 @@ func Variants() map[string]func(p *Params) {
 		"x-huntr":  func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-roof" },
 		"x-huntv5": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "v05fix" },
 		"gp-c71":   func(p *Params) { pfx(p); p.SlotPlan = "hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0" },
+		"gp-c88": func(p *Params) {
+			pfx(p)
+			p.SlotPlan = "hunt+quiet.0,hunt+quiet.1,hunt.0,hN2+quiet.2,hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0"
+		},
 		// Practice experiments: v0.7.4 for the first 24 s, the v0.13 play (no mortars) in a free-for-all,
 		// and a different practice stance each. Only the official score can judge them; whatever they
 		// score, free-for-all play is the same in all of them.
@@ -499,7 +552,9 @@ func pfx(p *Params) {
 	// v0.96 on a mech that has hurt us stays an attacker for 30 s instead of 4: v05fixq2, ffa-fixrf2.
 	// Free-for-all play only: practice never gets there, so practice scores are as before.)
 	// From v0.104 on: v05fixq3, ffa-fixrf3 (a hurt mech also shoots the drone that is plinking at it).
-	p.FFASwap, p.FFALate, p.FFALateT = "v05fixq3", "ffa-fixrf3", 50
+	// From v0.119 on: v05fixq7, ffa-fixrf7 (and stays out towards the edge of the next circle, away from
+	// the others: EdgeBias 3, EdgeBand 0.75).
+	p.FFASwap, p.FFALate, p.FFALateT = "v05fixq7", "ffa-fixrf7", 50
 }
 
 // v074 restores the parameters of the published v0.7.4.
