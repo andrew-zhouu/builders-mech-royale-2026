@@ -247,7 +247,11 @@ func (b *Bot) chooseHide(zi zoneInfo) int {
 			if d < 90 {
 				s += (90 - d) * 0.35
 			}
-			if d < 260 && (b.t-tr.LastSeen < 8 || hurt) {
+			seenMem := 8.0
+			if b.P.EvadeStay {
+				seenMem = 20 // (a watcher we stepped away from is still there a while later)
+			}
+			if d < 260 && (b.t-tr.LastSeen < seenMem || hurt) {
 				sc := tr.scale(b.sizePerCube)
 				if b.W.Visible(tr.Pos[0], tr.Pos[1], tr.Pos[2]+8*sc, x, y, gz+b.height*0.6) {
 					s += 30

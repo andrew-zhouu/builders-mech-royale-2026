@@ -344,6 +344,42 @@ func Variants() map[string]func(p *Params) {
 			p.LaserValue, p.LootBoost = 6, 30
 			p.ZoneSlack = 10
 		},
+		// k23 = k20 that stays where it has stepped out of a watcher's sight (EvadeStay); k24 = and counts a
+		// seen place as no hiding place (HideSeenCost)
+		"v05fixk23": func(p *Params) { keepAway20(p); p.EvadeStay = true },
+		"v05fixk24": func(p *Params) { keepAway20(p); p.EvadeStay = true; p.HideSeenCost = 100 },
+		"x-g0k23a4": func(p *Params) { gateTest(p, "v05fixk23", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k24a4": func(p *Params) { gateTest(p, "v05fixk24", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		// Attacked while keeping away, we stood and fought whenever the estimate gave us the edge, at any
+		// range (a re-enacted opening: 25 s of gunfire across 150 m of open ground, two attackers by the
+		// end). k25: never on the estimate, only inside 140 m; k26: only inside 70 m; k27: inside 40 m.
+		"v05fixk25": func(p *Params) { keepAway20(p); p.FFAEngage = 99 },
+		"v05fixk26": func(p *Params) { keepAway20(p); p.FFAEngage, p.StealthFightRange = 99, 70 },
+		"v05fixk27": func(p *Params) { keepAway20(p); p.FFAEngage, p.StealthFightRange = 99, 40 },
+		// k28 = k20 that, attacked from beyond 45 m with cover close by, runs to it instead of standing to
+		// fight (StealthCoverFirst); k29 = and never stands to fight on the estimate alone
+		"v05fixk28": func(p *Params) { keepAway20(p); p.StealthCoverFirst = 45 },
+		"v05fixk29": func(p *Params) { keepAway20(p); p.StealthCoverFirst, p.FFAEngage = 45, 99 },
+		"gg-c8": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", 1795363200
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateLateAlive, p.GateDoubt = "v05fixk29", "ffa-fixrf9z", 240, 4, gateDoubtS
+		},
+		"gg-open8": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", nowUnix()-60
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateLateAlive, p.GateDoubt = "v05fixk29", "ffa-fixrf9z", 240, 4, gateDoubtS
+		},
+		"x-g0k28a4": func(p *Params) { gateTest(p, "v05fixk28", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k29a4": func(p *Params) { gateTest(p, "v05fixk29", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k25a4": func(p *Params) { gateTest(p, "v05fixk25", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k26a4": func(p *Params) { gateTest(p, "v05fixk26", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k27a4": func(p *Params) { gateTest(p, "v05fixk27", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		// attacked while keeping away: stand and fight only inside 90 m (k21) or 60 m (k22) instead of 140 m
+		"v05fixk21": func(p *Params) { keepAway20(p); p.StealthFightRange = 90 },
+		"v05fixk22": func(p *Params) { keepAway20(p); p.StealthFightRange = 60 },
+		"x-g0k21a4": func(p *Params) { gateTest(p, "v05fixk21", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k22a4": func(p *Params) { gateTest(p, "v05fixk22", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
 		"x-g0k20a2": func(p *Params) { gateTest(p, "v05fixk20", 330); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 2 },
 		"x-g0k20a3": func(p *Params) { gateTest(p, "v05fixk20", 300); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 3 },
 		"x-g0k20a5": func(p *Params) { gateTest(p, "v05fixk20", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 5 },
@@ -1025,6 +1061,16 @@ func keepAway18(p *Params) {
 	statue(p, 80, false)
 	p.DropRadius, p.ZoneGoalHold = 100, true
 	p.CoverMargin, p.RunOnRange, p.RunOnGain, p.DeepStealth = 8, 80, 18, true
+}
+
+// keepAway20 is the keep-away set k20: k18 with the current gun lead, hit model, fight plan, laser value
+// and zone slack.
+func keepAway20(p *Params) {
+	keepAway18(p)
+	p.LeadDamp, p.LeadPersist, p.LeadCum = 0.65, true, true
+	p.HitModel, p.PlanV2 = 1, true
+	p.LaserValue, p.LootBoost = 6, 30
+	p.ZoneSlack = 10
 }
 
 // gateTest is a build whose gate is open: a free-for-all from the first tick, with swap as the quiet

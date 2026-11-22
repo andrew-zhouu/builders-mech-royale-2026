@@ -302,6 +302,21 @@ func (b *Bot) think(act *proto.Action) {
 					wantFight = false
 					unprovoked = true
 				}
+				// StealthCoverFirst: attacked from range with something to get behind close by, get
+				// behind it (shooting back on the way) rather than have it out in the open. Real matches
+				// (1,463 first hits, all teams): out of the attacker's line within a few seconds, alive
+				// 20 s later 77% of the time; stayed in view and shot back, 55%. Not from on top of us,
+				// not with a kill one burst away, and not with nowhere to go (only running: 10%).
+				if b.P.StealthCoverFirst > 0 && wantFight && tgt.d > b.P.StealthCoverFirst && !b.laserEdge(tgt.tr) &&
+					!(tgt.tr.LOS && tgt.tr.HP > 0 && tgt.tr.HP < b.myDPS(tgt.d)*1.5+60) {
+					if b.t-b.coverFirstT > 0.5 {
+						b.coverFirstT = b.t
+						b.coverFirstOK = b.findCover(ths, 45) >= 0
+					}
+					if b.coverFirstOK {
+						wantFight = false
+					}
+				}
 			case st.avoid:
 				// Free-for-all: an exchange at range without an edge is a coin flip that leaves even
 				// the winner weak, and being looked at is not being attacked.
@@ -852,7 +867,7 @@ func (b *Bot) think(act *proto.Action) {
 		}
 		// (LaserRespect: in the sight of a laser that is charging, or of any laser while we hold none,
 		// the walk to cover is a sprint: a full charge takes 0.75 s and there is no dodging the beam)
-		sprint := false
+		sprint := b.P.StealthCoverFirst > 0 && underFire && b.energy > 20 // (under fire, the walk to cover is a run)
 		if b.P.LaserSprint && b.energy > 25 {
 			for _, w := range watchers {
 				if w.tr.Laser && w.d > 25 && (w.tr.Charging || b.has("laser") < 0) {
@@ -866,6 +881,17 @@ func (b *Bot) think(act *proto.Action) {
 			if d := setGoal(cx, cy, 2.2, sprint); d < 0.9 || (d < 3.0 && b.hiddenHere(ths)) {
 				rq.wantW = 0
 				rq.hold = true
+				if b.P.EvadeStay {
+					// Out of their sight: this, not the place we were seen in, is where we wait now (and
+					// from here on to somewhere that stays hidden when they take a step: see the next case).
+					b.holdCell, b.hideT = b.evadeCell, b.t
+					if b.P.CoverMargin > 0 && b.t-b.deepTryT > 0.6 {
+						b.deepTryT = b.t
+						if c := b.deeperCover(ths, 45, false); c >= 0 {
+							b.deepCell, b.deepT, b.evadeDeepT = c, b.t, b.t+6
+						}
+					}
+				}
 			}
 		} else {
 			w := watchers[0]
@@ -874,6 +900,18 @@ func (b *Bot) think(act *proto.Action) {
 		}
 		// shoot back only at someone who is actually on us and close enough to hit
 		holdFire = tgt == nil || !tgt.engaged || tgt.d > b.P.FFAReturnFire
+
+	case st.stealth && b.P.EvadeStay && b.deepCell >= 0 && b.t < b.evadeDeepT && nEngaged == 0 && !onRoof:
+		// just out of a watcher's sight: on to cover that lasts, and wait there
+		b.mode = "evade-on"
+		cx, cy := b.Nav.Pos(b.deepCell)
+		if d := setGoal(cx, cy, 2.2, false); d < 1.5 || !goalOK {
+			b.holdCell, b.hideT = b.deepCell, b.t
+			b.deepCell = -1
+			rq.wantW = 0
+			rq.hold = true
+		}
+		holdFire = true
 
 	default:
 		if patient {
