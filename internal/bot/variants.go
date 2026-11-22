@@ -258,6 +258,54 @@ func Variants() map[string]func(p *Params) {
 			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
 		},
 		"p74q9": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq9", "ffa-fixrf9", 50 },
+		// The other way to play the first minute of a known free-for-all: no stealth phase; arm and farm
+		// at once, holding fire until touched, out towards the edge and away from the others (the brawl
+		// stance of ffa-fixrf9, the roof only once armed for it). In the real matches the stealth phase
+		// often has us unarmed and without a cube at 30-40 s when an armed aggressor finds us.
+		"ffa-fixc9": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.RoofFarmAfter = 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+		},
+		"p74c9": func(p *Params) { v074(p); p.FFASwap = "ffa-fixc9" },
+		// q10 = q9 + keep away from where shooting was heard in the last 8 s (EdgeNoise)
+		"v05fixq10": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+			p.EdgeNoise = 8
+		},
+		"ffa-fixrf10": func(p *Params) {
+			p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly, p.CrateGiveUp, p.NpcGiveUp = true, 40, true, 5, 8
+			p.BrawlRoofAfter, p.RoofFarmAfter = 0, 45
+			p.HealFirst, p.HealUntil = 0.75, 0.95
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+			p.EdgeNoise = 8
+		},
+		"p74q10": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixq10", "ffa-fixrf10", 50 },
+		// A third way: the quiet phase on the ground only (no roof climb, no walking about for a weapon:
+		// the nearest hideout and stay there), as the teams that die least in the first minute do.
+		"v05fixqd": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+			p.UseRoofs, p.NoStealthRoam = false, true
+		},
+		"p74d9": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixqd", "ffa-fixrf9", 50 },
+		// ... and the same with the roofs kept but no walking about
+		"v05fixqe": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+			p.NoStealthRoam = true
+		},
+		"p74e9": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixqe", "ffa-fixrf9", 50 },
 		"o-quiet3": func(p *Params) { p.QuietSlip, p.QuietSlipMin, p.HostileMem = true, 40, 30 },
 		// o-roof: the v0.5 opening (stealth: a weapon close by, then a roof, out of sight), holding fire
 		// until touched. In the real matches v0.5 died inside a minute in 2 of 24 (10 AM to 1 PM) where

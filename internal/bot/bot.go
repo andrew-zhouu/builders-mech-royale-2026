@@ -44,6 +44,8 @@ type Params struct {
 	NpcGiveUp     float64 // the same for a drone we are trying to shoot
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
+	EdgeNoise     float64 // with EdgeBias: loot near where weapons were heard in the last this many seconds is worth less (0 = sounds are not used)
+	NoStealthRoam bool    // stealth stances: do not go looking for a weapon when none is known; stay hidden
 	ClimbCheckAll bool    // the no-climb-in-someone's-sight rules in every stance, not only the brawl stances
 	ClimbClearMem float64 // ... counting mechs seen in the last this many seconds inside ClimbClearRange (0 = only those in view now)
 	EdgeBias      float64 // free-for-all sets: prefer hideouts, roofs and loot out towards the edge of the next circle and away from known mechs (0 = off)
@@ -62,6 +64,7 @@ type Params struct {
 	SeekRange     float64 // ... no farther away than this
 	SeekHP        float64 // ... and only above this fraction of our health
 	SlotPlan      string  // dice and practice set by seat group, "set.dice,set.dice,..." (see applySlotPlan)
+	FFAPlan       string  // free-for-all sets by seat group, "swap>late,swap,..." (see applyFFAPlan)
 	HouseModel    bool    // practice stance: reckon with the house bots' measured (poor) accuracy instead of the team bots'
 	KillFocus     float64 // how much a target's lost health counts when choosing whom to shoot (1 = as always)
 	HuntAfter     float64 // no fights of our own starting before this match time (0 = from the start)
@@ -178,19 +181,45 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gp:hunt+quiet.0,hunt+quiet.1,hunt.0,hN2+quiet.2,hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.1,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.1,hN2+quiet3.2,hunt+quiet.0"
+var BuildVariant = "gp:hunt+quiet3.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
 	p := baseParams()
 	if strings.HasPrefix(BuildVariant, "gp:") {
-		// a seat plan on the practice-experiment base (see applySlotPlan)
+		// a seat plan on the practice-experiment base (see applySlotPlan), optionally followed by
+		// "|" and a free-for-all plan (see applyFFAPlan)
 		pfx(&p)
 		p.SlotPlan = BuildVariant[3:]
+		if i := strings.Index(p.SlotPlan, "|"); i >= 0 {
+			p.SlotPlan, p.FFAPlan = p.SlotPlan[:i], p.SlotPlan[i+1:]
+		}
 	} else if BuildVariant != "" {
 		if f := Variants()[BuildVariant]; f != nil {
 			f(&p)
 		}
+	}
+	return p
+}
+
+// applyFFAPlan gives seat groups different play after a free-for-all is detected: FFAPlan is a
+// comma-separated list of "swap" or "swap>late" entries (parameter-set names for FFASwap and FFALate),
+// the group being the seat number modulo the number of entries. The seat is drawn afresh in every real
+// match, so the groups meet the same opponents: a comparison of two ways to play that the real
+// free-for-alls themselves decide. Practice never gets to these sets.
+func applyFFAPlan(p Params, slot int) Params {
+	parts := strings.Split(p.FFAPlan, ",")
+	if slot < 0 {
+		slot = -slot
+	}
+	e := strings.TrimSpace(parts[slot%len(parts)])
+	if e == "" {
+		return p
+	}
+	if i := strings.Index(e, ">"); i >= 0 {
+		p.FFASwap, p.FFALate = e[:i], e[i+1:]
+	} else {
+		p.FFASwap, p.FFALate = e, ""
 	}
 	return p
 }
@@ -524,6 +553,8 @@ type Bot struct {
 	lateDone    bool    // FFALate has been applied
 	pFFABase    Params  // the parameters FFASwap was applied to (FFALate starts from them again)
 	swapped     bool    // FFASwap has been applied
+	noise       []noiseSrc      // EdgeNoise: where weapons were heard lately (rough positions)
+	noiseI      int
 	ffLogged    bool            // (MECH_STATS) the first-fire line has been written
 	seekBan     map[int]float64 // Seek: mechs that were not where we last saw them, and until when to forget them
 	forThem     bool    // dpsOf is being asked about an opponent's weapons
@@ -632,6 +663,9 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	if p.SlotPlan != "" {
 		p = applySlotPlan(p, h.Slot)
 	}
+	if p.FFAPlan != "" {
+		p = applyFFAPlan(p, h.Slot)
+	}
 	b := &Bot{P: p, H: h, C: &h.Config, W: w, Nav: nav}
 	if p.OpenSet != "" {
 		// a different parameter set for the opening, while we do not know what kind of lobby this is
@@ -708,6 +742,9 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	b.surfT = -100
 	return b
 }
+
+// noiseSrc is a rough position at which a weapon was heard, and when.
+type noiseSrc struct{ x, y, t float64 }
 
 // Trace, when set (MECH_TRACE=1 in the local arena), logs our mode changes to stderr.
 var Trace = os.Getenv("MECH_TRACE") != ""
@@ -1145,6 +1182,27 @@ func (b *Bot) observe(o *proto.Obs) {
 			if sd.Dist != "far" {
 				b.lastSoundT = b.t - sd.Age
 				b.lastSoundB = sd.Bearing
+			}
+		}
+		// EdgeNoise: remember roughly where weapons have just been heard (a bearing good to 7 degrees
+		// and one of three distance classes), so that the loot chooser can keep away from the shooting
+		if b.P.EdgeNoise > 0 && sd.Age < 0.15 {
+			switch sd.Kind {
+			case "gun", "laser", "lightning", "mortar", "laser_charge":
+				r := 230.0
+				switch sd.Dist {
+				case "near":
+					r = 40
+				case "mid":
+					r = 110
+				}
+				src := noiseSrc{x: b.pos[0] + r*math.Cos(sd.Bearing), y: b.pos[1] + r*math.Sin(sd.Bearing), t: b.t}
+				if len(b.noise) < 32 {
+					b.noise = append(b.noise, src)
+				} else {
+					b.noise[b.noiseI%32] = src
+				}
+				b.noiseI++
 			}
 		}
 		// Gunfire all around in the first seconds (SoundFFA). In a free-for-all 15 mechs start

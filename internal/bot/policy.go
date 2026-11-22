@@ -1303,7 +1303,7 @@ func (b *Bot) roamTarget(st stance, hpFrac float64) (float64, float64, bool) {
 	}
 	if st.stealth {
 		// hiding with only the starting gun loses the endgame: look for a weapon while it is quiet
-		if b.armed() || b.t < 12 {
+		if b.armed() || b.t < 12 || b.P.NoStealthRoam {
 			return 0, 0, false
 		}
 		return b.roamGoal()

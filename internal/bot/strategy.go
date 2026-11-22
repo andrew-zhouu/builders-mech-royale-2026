@@ -438,6 +438,19 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 					dm = de
 				}
 			}
+			if b.P.EdgeNoise > 0 {
+				// ... and from where weapons were heard a moment ago (rough positions: half the weight)
+				dn := 120.0
+				for i := range b.noise {
+					if b.t-b.noise[i].t > b.P.EdgeNoise {
+						continue
+					}
+					if de := hyp(b.noise[i].x-l.pos[0], b.noise[i].y-l.pos[1]); de < dn {
+						dn = de
+					}
+				}
+				value *= math.Max(0.15, 1-b.P.EdgeBias*0.3*(1-dn/120))
+			}
 			if b.P.EdgeClamp {
 				// (later builds: nothing at all right beside a mech, and never a negative worth)
 				f := 1 - b.P.EdgeBias*0.6*(1-dm/120)
