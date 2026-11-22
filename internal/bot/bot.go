@@ -44,6 +44,7 @@ type Params struct {
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
 	HuntAfter     float64 // no fights of our own starting before this match time (0 = from the start)
+	NoMortarHard  bool    // never pick up a mortar, whatever hit model is in force (for the v0.5 set used inside a free-for-all)
 	SoundFFA      int     // NEVER USE (official practice 5.75 with it): gun shots from two directions in the opening taken as a free-for-all
 	SoundFFAUntil float64 // ... heard before this match time
 	FFALate       string  // variant applied (to the set FFASwap started from) once FFALateT has passed in a free-for-all ("" = none)
@@ -156,7 +157,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "p74e"
+var BuildVariant = "x-roof"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {

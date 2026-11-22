@@ -145,6 +145,22 @@ func Variants() map[string]func(p *Params) {
 			p.FFASwap, p.FFALate, p.FFALateT = "v05fix", "ffa-fixrf", 50
 		},
 		"p74d": func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fix", "ffa-fixrf", 50 },
+		// p74f = p74d without mortars in the quiet phase (a laser hit does 60% more to a mortar carrier)
+		"v05fixnm": func(p *Params) { v05(p); p.PathFix = true; p.CreditFix = true; p.NoMortarHard = true },
+		"p74f":     func(p *Params) { v074(p); p.FFASwap, p.FFALate, p.FFALateT = "v05fixnm", "ffa-fixrf", 50 },
+		// Practice experiments: v0.7.4 for the first 24 s, the v0.13 play (no mortars) in a free-for-all,
+		// and a different practice stance each. Only the official score can judge them; whatever they
+		// score, free-for-all play is the same in all of them.
+		"sq-roof":  func(p *Params) { p.RoofInSquad = true },
+		"sq-hunt":  func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200 },
+		"sq-c10":   func(p *Params) { p.WantCubes = 10 },
+		"sq-offst": func(p *Params) { p.UpOffense = 0.2; p.DuelDisengage = 0; p.LeaveTTD = 0; p.RetreatHP = 0 },
+		"x-off":    func(p *Params) { pfx(p); p.SquadSet = "sq-off" },
+		"x-stand":  func(p *Params) { pfx(p); p.SquadSet = "sq-stand" },
+		"x-roof":   func(p *Params) { pfx(p); p.SquadSet = "sq-roof" },
+		"x-hunt":   func(p *Params) { pfx(p); p.SquadSet = "sq-hunt" },
+		"x-c10":    func(p *Params) { pfx(p); p.SquadSet = "sq-c10" },
+		"x-heal":   func(p *Params) { pfx(p); p.SquadSet = "sq-heal" },
 		// p74e = out of sight after detection: cover when a known mech can see us, loot only what it
 		// cannot see, lie low otherwise, no fights of our own, all until 50 s; then the fixed game
 		"ffa-shy": func(p *Params) {
@@ -299,6 +315,13 @@ func v05(p *Params) {
 	p.RetreatRunMax = 0
 	p.CreditOpenS = 0
 	oldLead(p)
+}
+
+// pfx is the base of the practice experiments: v0.7.4 until the lobby is known, then (free-for-all) the
+// v0.13 play without mortars.
+func pfx(p *Params) {
+	v074(p)
+	p.FFASwap, p.FFALate, p.FFALateT = "v05fixnm", "ffa-fixrf", 50
 }
 
 // v074 restores the parameters of the published v0.7.4.
