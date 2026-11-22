@@ -170,6 +170,16 @@ func Variants() map[string]func(p *Params) {
 			p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200
 			p.Seek, p.WantCubes = 30, 10
 		},
+		// Opening sets (OpenSet: played until the lobby is known or the opening is over).
+		// o-quiet: we do not fire first on a mech that has not touched us. Real matches, 4-8 PM Saturday:
+		// our mech was hit by a mech inside 20 s in 52% of matches (TigerTown27: 19%), and in 64% of those
+		// cases it had hit that mech first; three of its seven deaths inside a minute began that way.
+		"o-quiet":  func(p *Params) { p.QuietSlip, p.QuietSlipMin = true, 40 },
+		"o-quiet2": func(p *Params) { p.QuietSlip, p.QuietSlipMin, p.LaserMechOnly = true, 40, true },
+		"x-huntq":  func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet" },
+		"x-huntq2": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet2" },
+		"x-hunt7q": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt7"; p.OpenSet = "o-quiet" },
+		"gp-hq":    func(p *Params) { pfx(p); p.SlotPlan = "hunt+quiet.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.0" },
 		"x-hunt2": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt2" },
 		"x-hunt3": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt3" },
 		"x-hunt4": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt4" },

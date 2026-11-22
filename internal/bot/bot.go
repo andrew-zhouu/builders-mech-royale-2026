@@ -165,7 +165,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gp:hunt.0,hunt.0,hunt.0,hunt4.2"
+var BuildVariant = "gp:hunt7+quiet.0,hunt7+quiet.0,hunt7+quiet.0,hunt7+quiet.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -201,6 +201,14 @@ func applySlotPlan(p Params, slot int) Params {
 	}
 	if n, err := strconv.Atoi(dice); err == nil {
 		p.Salt = n
+	}
+	// "set+open": also a parameter set for the opening ("o-<open>", through OpenSet), which, unlike the
+	// practice set, is played in free-for-alls too until the lobby is known
+	if i := strings.Index(set, "+"); i >= 0 {
+		if open := set[i+1:]; open != "" {
+			p.OpenSet = "o-" + open
+		}
+		set = set[:i]
 	}
 	if set != "" && set != "-" {
 		p.SquadSet = "sq-" + set
