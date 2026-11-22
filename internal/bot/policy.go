@@ -329,7 +329,7 @@ func (b *Bot) think(act *proto.Action) {
 			default:
 				wantFight = true
 			}
-		case st.hunt && b.t >= b.P.HuntAfter && tgt.adv >= st.engageRatio && tgt.d < huntR && tgt.tr.LOS && hpFrac > 0.6 &&
+		case st.hunt && b.t >= b.P.HuntAfter && tgt.adv >= st.engageRatio && tgt.d < huntR && tgt.tr.LOS && hpFrac > b.P.HuntHP &&
 			// (real matches: the one who fires first comes out ahead only with a laser against none:
 			// 11.1 final points against the victim's 9.1; level otherwise, and 2 points behind when it
 			// is the victim that has the laser)
@@ -883,6 +883,19 @@ func (b *Bot) think(act *proto.Action) {
 					rq.wantW = 0
 					rq.hold = true
 				}
+			} else if sx, sy, sid, ok := b.seekTarget(st, hpFrac); ok {
+				// (practice stance, Seek) fit and with nothing to pick up: go and find the next one
+				b.mode = "seek"
+				setGoal(sx, sy, 1.6, false)
+				if !goalOK {
+					// cannot walk there: forget that one (or that corner of the map) for a while
+					if sid >= 0 {
+						b.seekBan[sid] = b.t + 30
+					} else if b.roamCell >= 0 {
+						b.banUntil[-(b.roamCell + 1)] = b.t + 120
+						b.roamCell = -1
+					}
+				}
 			} else if rx, ry, ok := b.roamTarget(st, hpFrac); ok && !roofFirst && !earlyRoof && (!roofWanted || (!b.armed() && quiet)) {
 				// nothing known to pick up: go and look for crates and weapons
 				b.mode = "roam"
@@ -1241,6 +1254,49 @@ func (b *Bot) roamTarget(st stance, hpFrac float64) (float64, float64, bool) {
 		return 0, 0, false
 	}
 	return b.roamGoal()
+}
+
+// seekTarget (Seek > 0, the practice stance only): with nothing to pick up and health to spare, where to
+// go looking for the next fight: the last known place of the nearest mech seen in the last Seek seconds
+// that we would take on, else somewhere we have not looked at for a while (even with all the cubes we
+// wanted). Practice scores the house bots dead before we are, and a hunt that only starts when one of
+// them walks into view leaves the time between their visits unused.
+func (b *Bot) seekTarget(st stance, hpFrac float64) (x, y float64, id int, ok bool) {
+	if b.P.Seek <= 0 || st.name != "squad" || !st.hunt || hpFrac < b.P.SeekHP || b.t < b.P.HuntAfter {
+		return 0, 0, -1, false
+	}
+	if b.seekBan == nil {
+		b.seekBan = map[int]float64{}
+	}
+	var best *Track
+	bd := 1e18
+	for _, tr := range b.tracks {
+		if tr.NPC || b.t-tr.LastSeen > b.P.Seek {
+			continue
+		}
+		if until, ok := b.seekBan[tr.ID]; ok && b.t < until {
+			continue
+		}
+		d := dist2(b.pos, tr.Pos)
+		if d > b.P.SeekRange || !b.inFutureZone(tr.Pos[0], tr.Pos[1], 8, 6) {
+			continue
+		}
+		if d < 22 && !tr.Listed {
+			b.seekBan[tr.ID] = b.t + 20 // we are where it was and it is not here
+			continue
+		}
+		if adv, _, _ := b.fightPlan(tr, d); adv < st.engageRatio {
+			continue
+		}
+		if d < bd || (d == bd && best != nil && tr.ID < best.ID) {
+			best, bd = tr, d
+		}
+	}
+	if best != nil {
+		return best.Pos[0], best.Pos[1], best.ID, true
+	}
+	x, y, ok = b.roamGoal()
+	return x, y, -1, ok
 }
 
 // pest returns the drone that is shooting at us (the closest one that hurt us in the last few seconds).

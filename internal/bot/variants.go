@@ -153,6 +153,30 @@ func Variants() map[string]func(p *Params) {
 		// score, free-for-all play is the same in all of them.
 		"sq-roof":  func(p *Params) { p.RoofInSquad = true },
 		"sq-hunt":  func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200 },
+		// v0.24 (sq-hunt) scored 6.29, our best: more of the same, in two directions and both together
+		// hunt2 = hunts at longer range, on thinner odds and with less health in hand
+		"sq-hunt2": func(p *Params) { p.EngageRatio = 0.7; p.HuntRange = 220; p.HuntRangeLaser = 250; p.HuntHP = 0.5 },
+		// hunt3 = sq-hunt, and goes looking for the next one instead of waiting in a hide
+		"sq-hunt3": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.Seek = 30 },
+		"sq-hunt4": func(p *Params) {
+			p.EngageRatio = 0.7; p.HuntRange = 220; p.HuntRangeLaser = 250; p.HuntHP = 0.5
+			p.Seek = 30
+		},
+		// hunt5 = sq-hunt with the fight plan on the house bots' measured accuracy; hunt6 = sq-hunt
+		// stopping the farming at 10 cubes (stats stop growing there), so the hunting starts sooner
+		"sq-hunt5": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.HouseModel = true },
+		"sq-hunt6": func(p *Params) { p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200; p.WantCubes = 10 },
+		"sq-hunt7": func(p *Params) {
+			p.EngageRatio = 0.9; p.HuntRange = 180; p.HuntRangeLaser = 200
+			p.Seek, p.WantCubes = 30, 10
+		},
+		"x-hunt2": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt2" },
+		"x-hunt3": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt3" },
+		"x-hunt4": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt4" },
+		"x-hunt5": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt5" },
+		"x-hunt6": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt6" },
+		"x-hunt7": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt7" },
+		"gp-hid":  func(p *Params) { pfx(p); p.SlotPlan = "hunt.0,hunt.0,hunt.0,hunt.0" },
 		"sq-c10":   func(p *Params) { p.WantCubes = 10 },
 		"sq-offst": func(p *Params) { p.UpOffense = 0.2; p.DuelDisengage = 0; p.LeaveTTD = 0; p.RetreatHP = 0 },
 		// seat plans (see applySlotPlan), for the local checks of that mechanism

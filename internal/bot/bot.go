@@ -44,6 +44,10 @@ type Params struct {
 	NpcGiveUp     float64 // the same for a drone we are trying to shoot
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
+	HuntHP        float64 // only start a hunt above this fraction of our health
+	Seek          float64 // practice stance: with nothing to pick up, go after the nearest mech seen in the last Seek seconds, else look around (0 = wait in a hide, as before)
+	SeekRange     float64 // ... no farther away than this
+	SeekHP        float64 // ... and only above this fraction of our health
 	SlotPlan      string  // dice and practice set by seat group, "set.dice,set.dice,..." (see applySlotPlan)
 	HouseModel    bool    // practice stance: reckon with the house bots' measured (poor) accuracy instead of the team bots'
 	KillFocus     float64 // how much a target's lost health counts when choosing whom to shoot (1 = as always)
@@ -161,7 +165,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gp:-.0,-.0,-.0,-.3"
+var BuildVariant = "gp:hunt7.1,hunt.0,hunt.0,hunt.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -220,6 +224,9 @@ func baseParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
+		HuntHP:        0.6,
+		SeekRange:     320,
+		SeekHP:        0.7,
 		KillFocus:     1,
 		Salt:          0,
 		QuietSlip:     true, // do not start it with a mech that has not touched us, unless we hold a laser and it does not
@@ -485,6 +492,7 @@ type Bot struct {
 	lateDone    bool    // FFALate has been applied
 	pFFABase    Params  // the parameters FFASwap was applied to (FFALate starts from them again)
 	swapped     bool    // FFASwap has been applied
+	seekBan     map[int]float64 // Seek: mechs that were not where we last saw them, and until when to forget them
 	forThem     bool    // dpsOf is being asked about an opponent's weapons
 	healing     bool    // HealFirst: hurt and letting the health come back before farming again
 	crateTryID  int     // the crate (or drone) we are working on, when we started and its health then
