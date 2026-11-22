@@ -472,8 +472,17 @@ func (b *Bot) theirGunHit(d float64) float64 {
 	if b.realModel() {
 		return hitTable(d, realTheirGun)
 	}
+	if b.P.HouseModel {
+		return hitTable(d, houseGun)
+	}
 	return theirGunHitProb(d)
 }
+
+// houseGun is how the house bots shoot (1,457 gun shots in public lobbies: 85% inside 40 m, 52% at
+// 40-80 m, 26% at 80-120 m, 15% at 120-180 m, 1% beyond; their lasers land 30%). HouseModel puts these
+// in place of the team-bot numbers when the lobby is taken to be the practice squad, so that the fight
+// plan sees how lopsided a long-range exchange with them is.
+var houseGun = [][2]float64{{20, 0.85}, {60, 0.52}, {100, 0.26}, {150, 0.15}, {205, 0.02}}
 
 // theirGunHitProb is how often a typical opponent's gun hits us at a range: measured accuracy of the
 // top-16 bots on targets that do not dodge (98/88/57/41/17% by band), reduced a little at range
@@ -512,6 +521,8 @@ func (b *Bot) dpsOf(gun, laser, light, mortar bool, cubes int, d float64, energy
 			lh := 0.85
 			if b.realModel() {
 				lh = 0.75 // the field's lasers land 73% (most misses are beams stopped by cover)
+			} else if b.forThem && b.P.HouseModel {
+				lh = 0.35 // the house bots' lasers land 30%
 			}
 			total += stat(l, "damage", 315) / (stat(l, "charge", 0.75) + stat(l, "cooldown", 1.65)) * lh
 		}
@@ -552,7 +563,10 @@ func (b *Bot) theirDPS(tr *Track, d float64) float64 {
 			laser = false
 		}
 	}
-	return b.dpsOf(gun, laser, tr.Light, tr.Mortar, tr.Cubes, d, true, b.theirGunHit)
+	b.forThem = true
+	v := b.dpsOf(gun, laser, tr.Light, tr.Mortar, tr.Cubes, d, true, b.theirGunHit)
+	b.forThem = false
+	return v
 }
 
 // advantage is (time they need to kill us) / (time we need to kill them); > 1 favours us.

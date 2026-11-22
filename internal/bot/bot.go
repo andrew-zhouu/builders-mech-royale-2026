@@ -43,6 +43,7 @@ type Params struct {
 	NpcGiveUp     float64 // the same for a drone we are trying to shoot
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
+	HouseModel    bool    // practice stance: reckon with the house bots' measured (poor) accuracy instead of the team bots'
 	KillFocus     float64 // how much a target's lost health counts when choosing whom to shoot (1 = as always)
 	HuntAfter     float64 // no fights of our own starting before this match time (0 = from the start)
 	NoMortarHard  bool    // never pick up a mortar, whatever hit model is in force (for the v0.5 set used inside a free-for-all)
@@ -158,7 +159,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "p74f"
+var BuildVariant = "x-house"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -452,6 +453,7 @@ type Bot struct {
 	lateDone    bool    // FFALate has been applied
 	pFFABase    Params  // the parameters FFASwap was applied to (FFALate starts from them again)
 	swapped     bool    // FFASwap has been applied
+	forThem     bool    // dpsOf is being asked about an opponent's weapons
 	healing     bool    // HealFirst: hurt and letting the health come back before farming again
 	crateTryID  int     // the crate (or drone) we are working on, when we started and its health then
 	crateTryT   float64
