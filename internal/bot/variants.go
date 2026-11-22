@@ -310,6 +310,65 @@ func Variants() map[string]func(p *Params) {
 		// k17 = k13 that goes for a supply drop only from 100 m (re-enacted, the hiding seats: top-4 50%
 		// -> 56%, mean survival 147 -> 155 s), with ZoneGoalHold
 		"v05fixk17": func(p *Params) { statue(p, 80, false); p.DropRadius = 100; p.ZoneGoalHold = true },
+		// k18 = k17 with the later builds' retreat (on from the first corner to cover that lasts)
+		"v05fixk18": func(p *Params) {
+			statue(p, 80, false)
+			p.DropRadius, p.ZoneGoalHold = 100, true
+			p.CoverMargin, p.RunOnRange, p.RunOnGain, p.DeepStealth = 8, 80, 18, true
+		},
+		// The keep-away set stands on the v0.5 parameters, which also switch off later work that has
+		// nothing to do with stealth. k19a: the current gun lead back. k19b: and the measured hit model
+		// with the newer fight plan. k19c: and the laser valued as in the later builds (twice), with the
+		// sprint for one. k19d: and the zone slack.
+		"v05fixk19a": func(p *Params) { keepAway18(p); p.LeadDamp, p.LeadPersist, p.LeadCum = 0.65, true, true },
+		"v05fixk19b": func(p *Params) {
+			keepAway18(p)
+			p.LeadDamp, p.LeadPersist, p.LeadCum = 0.65, true, true
+			p.HitModel, p.PlanV2 = 1, true
+		},
+		"v05fixk19c": func(p *Params) {
+			keepAway18(p)
+			p.LeadDamp, p.LeadPersist, p.LeadCum = 0.65, true, true
+			p.LaserValue, p.LootBoost = 6, 30
+		},
+		"v05fixk19d": func(p *Params) {
+			keepAway18(p)
+			p.LeadDamp, p.LeadPersist, p.LeadCum = 0.65, true, true
+			p.ZoneSlack = 10
+		},
+		// k20 = k18 with all four back
+		"v05fixk20": func(p *Params) {
+			keepAway18(p)
+			p.LeadDamp, p.LeadPersist, p.LeadCum = 0.65, true, true
+			p.HitModel, p.PlanV2 = 1, true
+			p.LaserValue, p.LootBoost = 6, 30
+			p.ZoneSlack = 10
+		},
+		"x-g0k20a2": func(p *Params) { gateTest(p, "v05fixk20", 330); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 2 },
+		"x-g0k20a3": func(p *Params) { gateTest(p, "v05fixk20", 300); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 3 },
+		"x-g0k20a5": func(p *Params) { gateTest(p, "v05fixk20", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 5 },
+		"x-g0k20a6": func(p *Params) { gateTest(p, "v05fixk20", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 6 },
+		"x-g0k20t":  func(p *Params) { gateTest(p, "v05fixk20", 180); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k20":   func(p *Params) { gateTest(p, "v05fixk20", 60); p.FFALate = "ffa-fixrf9z" },
+		"x-g0k20a4": func(p *Params) { gateTest(p, "v05fixk20", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"gg-c7": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", 1795363200
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk20", "ffa-fixrf9z", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		"gg-open7": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", nowUnix()-60
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk20", "ffa-fixrf9z", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		"x-g0k19aa4": func(p *Params) { gateTest(p, "v05fixk19a", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k19ba4": func(p *Params) { gateTest(p, "v05fixk19b", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k19ca4": func(p *Params) { gateTest(p, "v05fixk19c", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k19da4": func(p *Params) { gateTest(p, "v05fixk19d", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
+		"x-g0k18":   func(p *Params) { gateTest(p, "v05fixk18", 60); p.FFALate = "ffa-fixrf9z" },
+		"x-g0k18a4": func(p *Params) { gateTest(p, "v05fixk18", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
 		"x-g0k17":   func(p *Params) { gateTest(p, "v05fixk17", 60); p.FFALate = "ffa-fixrf9z" },
 		"x-g0k17a4": func(p *Params) { gateTest(p, "v05fixk17", 240); p.FFALate, p.FFALateAlive = "ffa-fixrf9z", 4 },
 		"gg-c6": func(p *Params) {
@@ -434,6 +493,24 @@ func Variants() map[string]func(p *Params) {
 			p.Seek, p.WantCubes = 30, 3
 			p.HealFirst, p.HealUntil, p.HuntHP, p.SeekHP = 0.9, 0.98, 0.85, 0.9
 		},
+		// Patient (practice): the squad sends one hunter until we kill, so gear up first and start killing
+		// late. pat1: until 120 s or 10 cubes; pat2: until 180 s or 15 cubes; pat3: until 150 s or 12 cubes
+		// and the single hunter is swatted only inside 40 m.
+		"sq-pat1": func(p *Params) {
+			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200
+			p.PatientSecs, p.PatientCubes, p.PatientRange = 120, 10, 70
+		},
+		"sq-pat2": func(p *Params) {
+			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200
+			p.PatientSecs, p.PatientCubes, p.PatientRange = 180, 15, 70
+		},
+		"sq-pat3": func(p *Params) {
+			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200
+			p.PatientSecs, p.PatientCubes, p.PatientRange = 150, 12, 40
+		},
+		"x-pat1":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-pat1", "o-quiet3" },
+		"x-pat2":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-pat2", "o-quiet3" },
+		"x-pat3":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-pat3", "o-quiet3" },
 		"x-heal1": func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-heal1", "o-quiet3" },
 		"x-heal2": func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-heal2", "o-quiet3" },
 		"x-heal3": func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-heal3", "o-quiet3" },
@@ -940,6 +1017,14 @@ func statue(p *Params, reach float64, noFarm bool) {
 	p.DropStick = true
 	p.LaserRespect, p.ThreatMem = 60, 30
 	p.NoFarm = noFarm
+}
+
+// keepAway18 is the keep-away set k18: statue with reach 80 m, drops from 100 m, a steady over-the-walls
+// goal, and the later builds' retreat.
+func keepAway18(p *Params) {
+	statue(p, 80, false)
+	p.DropRadius, p.ZoneGoalHold = 100, true
+	p.CoverMargin, p.RunOnRange, p.RunOnGain, p.DeepStealth = 8, 80, 18, true
 }
 
 // gateTest is a build whose gate is open: a free-for-all from the first tick, with swap as the quiet

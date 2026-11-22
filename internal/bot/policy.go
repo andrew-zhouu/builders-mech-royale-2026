@@ -677,7 +677,10 @@ func (b *Bot) think(act *proto.Action) {
 	case b.retreating:
 		b.mode = "retreat"
 		// a leg deeper into cover, once begun, is walked to its end unless it stops being cover
-		deeper := (b.P.RunOnRange > 0 || b.P.CoverMargin > 0) && st.avoid // (free-for-all stances only)
+		// (free-for-all stances only; DeepStealth: the stealth stances too. Their retreat was still the
+		// first one we wrote: stop at the first corner, where in the real matches we were seen again
+		// within 10 s four times in five)
+		deeper := (b.P.RunOnRange > 0 || b.P.CoverMargin > 0) && (st.avoid || b.P.DeepStealth)
 		deep := deeper && b.deepCell >= 0 && b.t-b.deepT < 8
 		if deep && (b.t-b.lastWeaponDT < 0.45 || !b.cellHidden(b.deepCell, ths)) {
 			deep = false // hit on the way, or it can be seen now: nearest cover first
@@ -725,7 +728,7 @@ func (b *Bot) think(act *proto.Action) {
 			dx, dy := norm2(b.pos[0]-from.tr.Pos[0], b.pos[1]-from.tr.Pos[1])
 			gx, gy := b.pos[0]+dx*30, b.pos[1]+dy*30
 			setGoal(gx, gy, 2.0, b.energy > 30)
-		} else if b.P.CoverMargin > 0 && st.avoid && zi.outNext < -5 && b.t-b.lastNpcDT > 4 && b.t-b.lastWeaponDT < 30 {
+		} else if b.P.CoverMargin > 0 && (st.avoid || b.P.DeepStealth) && zi.outNext < -5 && b.t-b.lastNpcDT > 4 && b.t-b.lastWeaponDT < 30 {
 			// (not with a drone plinking at us, which stops the health coming back: walk on then; and
 			// not for ever, in case something else does)
 			// nobody on us and nobody in mind any more: stay behind what we found until the health is
