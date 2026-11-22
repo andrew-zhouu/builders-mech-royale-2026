@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"mechroyale/internal/proto"
 	"mechroyale/internal/world"
@@ -46,6 +47,10 @@ type Params struct {
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
 	EdgeNoise     float64 // with EdgeBias: loot near where weapons were heard in the last this many seconds is worth less (0 = sounds are not used)
 	NoStealthRoam bool    // stealth stances: do not go looking for a weapon when none is known; stay hidden
+	HideNearW     float64 // stealth stances: points per metre of travel when choosing where to hide (0 = the usual 0.16)
+	KeepAway      float64 // hide choice: cost of one known mech at point blank, falling off with distance (0 = off; see chooseHide)
+	KeepAwayMem   float64 // ... mechs seen and weapons heard this many seconds ago still count
+	KeepAwayStay  float64 // ... and the place we already hold is this much better than its score says
 	ClimbCheckAll bool    // the no-climb-in-someone's-sight rules in every stance, not only the brawl stances
 	ClimbClearMem float64 // ... counting mechs seen in the last this many seconds inside ClimbClearRange (0 = only those in view now)
 	EdgeBias      float64 // free-for-all sets: prefer hideouts, roofs and loot out towards the edge of the next circle and away from known mechs (0 = off)
@@ -79,7 +84,21 @@ type Params struct {
 	UpOffense     float64 // added to the rank of damage upgrades when choosing one (0 = defence first)
 	HealFirst     float64 // hurt below this share of our health and left alone: no shooting crates or drones (it stops the regeneration) ...
 	HealUntil     float64 // ... until back above this share (0 with HealFirst 0 = off)
-	ForceFFA      bool    // testing: assume a free-for-all from the start
+	ForceFFA      bool    // assume a free-for-all from the start
+	// FFAFrom: from this moment (Unix seconds; 0 = never) every match is a free-for-all for certain, and
+	// is played as one from the first tick. Practice scoring ends at the submission cutoff; the
+	// qualifying round and the final series that follow are free-for-alls only, so a build given the
+	// cutoff here has nothing left to find out about its lobby. Before that moment the build plays
+	// exactly as one without it. GateSwap, GateLate, GateLateT: the sets played then (as FFASwap,
+	// FFALate, FFALateT; "" or 0 = the ones used after detection).
+	FFAFrom   int64
+	GateSwap  string
+	GateLate  string
+	GateLateT float64
+	// GateDoubt: with the gate open, a match in which nobody has died by this time but mechs we killed
+	// (seconds; 0 = never doubt) is the house squad after all, and is played as practice from then on.
+	// Every recorded free-for-all has had a death inside 35 s; against the squad nobody dies but by us.
+	GateDoubt float64
 	SlotRule      bool    // WRONG, never enable: the track page says the practice slot varies each match
 	CloseDisengage float64 // disengage threshold against an attacker within ~60 m (stealth stances)
 	DuelDisengage  float64 // leave a one-on-one only below this advantage
@@ -181,12 +200,23 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gp:hunt+quiet3.7"
+var BuildVariant = "gg:1795341600:v05fixk9:ffa-fixrf9:60:hunt+quiet3.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
 	p := baseParams()
-	if strings.HasPrefix(BuildVariant, "gp:") {
+	if strings.HasPrefix(BuildVariant, "gg:") {
+		// "gg:<unix time>:<gate swap>:<gate late>:<gate late t>:<seat plan>": a seat plan as under "gp:",
+		// and from the given moment a free-for-all from the first tick with the sets named (see FFAFrom)
+		if f := strings.SplitN(BuildVariant[3:], ":", 5); len(f) == 5 {
+			pfx(&p)
+			p.FFAFrom, _ = strconv.ParseInt(f[0], 10, 64)
+			p.GateSwap, p.GateLate = f[1], f[2]
+			p.GateLateT, _ = strconv.ParseFloat(f[3], 64)
+			p.GateDoubt = gateDoubtS
+			p.SlotPlan = f[4]
+		}
+	} else if strings.HasPrefix(BuildVariant, "gp:") {
 		// a seat plan on the practice-experiment base (see applySlotPlan), optionally followed by
 		// "|" and a free-for-all plan (see applyFFAPlan)
 		pfx(&p)
@@ -220,6 +250,38 @@ func applyFFAPlan(p Params, slot int) Params {
 		p.FFASwap, p.FFALate = e[:i], e[i+1:]
 	} else {
 		p.FFASwap, p.FFALate = e, ""
+	}
+	return p
+}
+
+// nowUnix is the wall clock (a variable so that tests can set it).
+var nowUnix = func() int64 { return time.Now().Unix() }
+
+// gateWindow: how long after FFAFrom the gate stays open. The qualifying round and the final follow the
+// cutoff within hours; a clock that reads far off (unset, or years ahead) must not open anything.
+const gateWindow = 5 * 86400
+
+// gateDoubtS is the GateDoubt of the published gated builds: in 153 recorded free-for-alls the first
+// death came at 13 s in the median and never later than 45 s.
+const gateDoubtS = 60
+
+// gateOpen reports whether a build with FFAFrom = from takes every match for a free-for-all at time now.
+func gateOpen(from, now int64) bool {
+	return from > 0 && now >= from && now < from+gateWindow
+}
+
+// applyGate is what an open gate does to the parameters: a free-for-all from the first tick, with the
+// gate's own sets where it names any.
+func applyGate(p Params) Params {
+	p.ForceFFA = true
+	if p.GateSwap != "" {
+		p.FFASwap = p.GateSwap
+	}
+	if p.GateLate != "" {
+		p.FFALate = p.GateLate
+	}
+	if p.GateLateT > 0 {
+		p.FFALateT = p.GateLateT
 	}
 	return p
 }
@@ -550,6 +612,9 @@ type Bot struct {
 	deepTryT   float64 // ... when we last looked for one
 	gunSector   [12]int // SoundFFA: gun shots heard so far, by direction (30 degree sectors)
 	soundFFA    bool    // SoundFFA: the opening sounded like a free-for-all
+	gateOn      bool    // the build's gate was open when the match began (see Params.FFAFrom)
+	gateOff     bool    // ... and has been overruled by the match itself (see Params.GateDoubt)
+	pUngated    Params  // the parameters without the gate
 	lateDone    bool    // FFALate has been applied
 	pFFABase    Params  // the parameters FFASwap was applied to (FFALate starts from them again)
 	swapped     bool    // FFASwap has been applied
@@ -666,7 +731,13 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	if p.FFAPlan != "" {
 		p = applyFFAPlan(p, h.Slot)
 	}
+	ungated := p
+	gate := gateOpen(p.FFAFrom, nowUnix())
+	if gate {
+		p = applyGate(p)
+	}
 	b := &Bot{P: p, H: h, C: &h.Config, W: w, Nav: nav}
+	b.gateOn, b.pUngated = gate, ungated
 	if p.OpenSet != "" {
 		// a different parameter set for the opening, while we do not know what kind of lobby this is
 		if f := Variants()[p.OpenSet]; f != nil {
@@ -745,6 +816,26 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 
 // noiseSrc is a rough position at which a weapon was heard, and when.
 type noiseSrc struct{ x, y, t float64 }
+
+// noteNoise remembers a heard source at a rough position (r metres off): merged into a source heard in
+// the last 4 s close to it (the nearer of 60 m and 0.6 r... at least 30 m), else a new entry (32 kept).
+func (b *Bot) noteNoise(x, y, r float64) {
+	merge := math.Max(30, math.Min(60, 0.6*r))
+	for i := range b.noise {
+		n := &b.noise[i]
+		if b.t-n.t <= 4 && hyp(n.x-x, n.y-y) <= merge {
+			n.x, n.y, n.t = (n.x+x)/2, (n.y+y)/2, b.t
+			return
+		}
+	}
+	src := noiseSrc{x: x, y: y, t: b.t}
+	if len(b.noise) < 32 {
+		b.noise = append(b.noise, src)
+	} else {
+		b.noise[b.noiseI%32] = src
+	}
+	b.noiseI++
+}
 
 // Trace, when set (MECH_TRACE=1 in the local arena), logs our mode changes to stderr.
 var Trace = os.Getenv("MECH_TRACE") != ""
@@ -1186,7 +1277,7 @@ func (b *Bot) observe(o *proto.Obs) {
 		}
 		// EdgeNoise: remember roughly where weapons have just been heard (a bearing good to 7 degrees
 		// and one of three distance classes), so that the loot chooser can keep away from the shooting
-		if b.P.EdgeNoise > 0 && sd.Age < 0.15 {
+		if b.P.EdgeNoise > 0 && b.P.KeepAway <= 0 && sd.Age < 0.15 {
 			switch sd.Kind {
 			case "gun", "laser", "lightning", "mortar", "laser_charge":
 				r := 230.0
@@ -1203,6 +1294,31 @@ func (b *Bot) observe(o *proto.Obs) {
 					b.noise[b.noiseI%32] = src
 				}
 				b.noiseI++
+			}
+		}
+		// KeepAway: the same memory, kept per source rather than per shot (a mech emptying its gun into a
+		// crate is one mech), and with movement as well: steps carry 40 m, boosts and jets 90 m.
+		if b.P.KeepAway > 0 && sd.Age < 0.15 {
+			r := -1.0
+			switch sd.Kind {
+			case "gun", "laser", "lightning", "mortar", "laser_charge":
+				r = 230
+				switch sd.Dist {
+				case "near":
+					r = 40
+				case "mid":
+					r = 110
+				}
+			case "step":
+				r = 25
+			case "boost", "jet":
+				r = 70
+				if sd.Dist == "near" {
+					r = 35
+				}
+			}
+			if r > 0 {
+				b.noteNoise(b.pos[0]+r*math.Cos(sd.Bearing), b.pos[1]+r*math.Sin(sd.Bearing), r)
 			}
 		}
 		// Gunfire all around in the first seconds (SoundFFA). In a free-for-all 15 mechs start

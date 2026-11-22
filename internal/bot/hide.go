@@ -123,6 +123,46 @@ func (b *Bot) chooseHide(zi zoneInfo) int {
 	// the region we may hide in: the next circle, shrunk by a margin; early in a long hold we also
 	// accept anywhere in the current circle that the next shrink will not reach soon
 	margin := math.Min(14, z.NextRadius*0.25)
+	// KeepAway (free-for-all sets): nearness to the mechs we know of as a cost in its own right, before
+	// the shortlist is drawn. In the real matches the time a mech spends near others in its first 30 s,
+	// weighted by how near, sorts the field: the quarter with the least of it was hit inside 20 s 14% of
+	// the time and scored 9.3, the quarter with the most 75% and 6.5; the teams that die least keep it
+	// a third below ours. Mechs seen in the last KeepAwayMem seconds count in full, weapons heard in
+	// that time (rough positions) half.
+	type kaPt struct{ x, y, w float64 }
+	var kaPts []kaPt
+	if b.P.KeepAway > 0 {
+		for _, tr := range b.tracks {
+			if tr.NPC || b.t-tr.LastSeen > b.P.KeepAwayMem {
+				continue
+			}
+			kaPts = append(kaPts, kaPt{tr.Pos[0], tr.Pos[1], 1})
+		}
+		nTr := len(kaPts)
+		for i := range b.noise {
+			if b.t-b.noise[i].t > b.P.KeepAwayMem {
+				continue
+			}
+			// (not the mech we can see making it)
+			dup := false
+			for _, q := range kaPts[:nTr] {
+				if hyp(q.x-b.noise[i].x, q.y-b.noise[i].y) < 50 {
+					dup = true
+					break
+				}
+			}
+			if !dup {
+				kaPts = append(kaPts, kaPt{b.noise[i].x, b.noise[i].y, 0.5})
+			}
+		}
+	}
+	keepAway := func(x, y float64) float64 {
+		s := 0.0
+		for _, q := range kaPts {
+			s += q.w * nearW(hyp(q.x-x, q.y-y))
+		}
+		return b.P.KeepAway * s
+	}
 	var cands []hideCand
 	for j := 0; j < exp.NY; j++ {
 		for i := 0; i < exp.NX; i++ {
@@ -164,6 +204,12 @@ func (b *Bot) chooseHide(zi zoneInfo) int {
 			s += float64(b.Nav.Clear[k]) * 0.8
 			if k == b.holdCell {
 				s -= 9
+				if b.P.KeepAway > 0 {
+					s -= b.P.KeepAwayStay // moving is being seen and heard: only for a clearly better place
+				}
+			}
+			if len(kaPts) > 0 {
+				s += keepAway(x, y)
 			}
 			cands = append(cands, hideCand{k, s})
 		}
@@ -208,7 +254,19 @@ func (b *Bot) chooseHide(zi zoneInfo) int {
 	return best
 }
 
+// nearW is how much one mech at distance d weighs in the keep-away cost: 1 inside 40 m, a fifth at
+// 100 m, a fourteenth at 140 m (a smooth version of the danger measure's bands).
+func nearW(d float64) float64 {
+	if d <= 40 {
+		return 1
+	}
+	return math.Exp(-(d - 40) / 38)
+}
+
 func (b *Bot) hideDistW() float64 {
+	if b.P.HideNearW > 0 && b.st.stealth {
+		return b.P.HideNearW
+	}
 	if b.st.stealth {
 		return 0.16
 	}

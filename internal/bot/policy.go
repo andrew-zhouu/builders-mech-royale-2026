@@ -35,6 +35,14 @@ func (b *Bot) navCost() func(k int) float32 {
 func (b *Bot) think(act *proto.Action) {
 	b.pickUpgrade(act)
 	b.manageWeapons(act)
+	if b.gateOn && !b.gateOff && b.P.GateDoubt > 0 && b.t >= b.P.GateDoubt && b.unexplained == 0 {
+		// The gate said free-for-all, yet nobody has died who was not ours: the house squad. Back to
+		// the build as it is without the gate (the practice set follows at once, the opening being over;
+		// should the others start dying after all, the usual detection still applies).
+		b.gateOff = true
+		b.P, b.pBase = b.pUngated, b.pUngated
+		b.ffa, b.swapped, b.lateDone, b.squadOn, b.openSetOn = false, false, false, false, false
+	}
 	st := b.belief()
 	if b.openSetOn && (b.ffa || !b.openPhase()) {
 		// the lobby is known (a free-for-all) or assumed (practice): the opening set has done its part

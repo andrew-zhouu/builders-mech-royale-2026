@@ -377,6 +377,126 @@ func Variants() map[string]func(p *Params) {
 		"x-huntq":  func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet" },
 		"x-huntq2": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet2" },
 		"x-hunt7q": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt7"; p.OpenSet = "o-quiet" },
+		"x-huntq3": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet3" },
+		// A free-for-all known from the first tick (what a build does once its FFAFrom time has passed):
+		// g0 = the quiet set at once; g0s = with the position-first rule for the first 25 s; g0d, g0e =
+		// the ground-only and no-roaming quiet sets; g0c = arm and farm at once.
+		"v05fixq9s": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+			p.ShySecs, p.ShyRange, p.ShyLaser, p.ShyMem, p.ShyBoost = 25, 220, 60, 6, 40
+		},
+		// "bunker" quiet sets: stay by the spawn. (Re-enacted real matches: a mech that never leaves its
+		// spawn spends 0.20 of the danger measure in the first 30 s; our quiet set from the first tick
+		// 0.33; the real field 0.33; the two best free-for-all teams 0.24-0.26.)
+		"v05fixb1": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+			p.UseRoofs, p.NoStealthRoam = false, true
+			p.ArmRadius, p.FFALootRadius = 40, 40
+		},
+		"v05fixb2": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+			p.UseRoofs, p.NoStealthRoam = false, true
+			p.ArmRadius, p.FFALootRadius = 25, 25
+		},
+		"v05fixb3": func(p *Params) {
+			v05(p)
+			p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+			p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 0, 0
+			p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+			p.UseRoofs, p.NoStealthRoam = false, true
+			p.ArmRadius, p.FFALootRadius = 25, 25
+			p.HideNearW = 1.0
+		},
+		// ... and with nearness to known mechs as a cost when choosing where to hide (KeepAway)
+		"v05fixk1": func(p *Params) { bunker(p, 25, 1.0); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 200, 12, 20 },
+		"v05fixk2": func(p *Params) { bunker(p, 25, 0.5); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 200, 12, 20 },
+		"v05fixk3": func(p *Params) { bunker(p, 25, 0.5); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 400, 12, 20 },
+		"v05fixk4": func(p *Params) { bunker(p, 25, 0.3); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 400, 20, 30 },
+		"v05fixk5": func(p *Params) { bunker(p, 40, 0.5); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 400, 12, 20 },
+		"v05fixk6":  func(p *Params) { bunker(p, 40, 0.5); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 12, 20 },
+		"v05fixk7":  func(p *Params) { bunker(p, 40, 0.3); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20 },
+		"v05fixk8":  func(p *Params) { bunker(p, 40, 0.5); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 400, 20, 10 },
+		"v05fixk9":  func(p *Params) { bunker(p, 60, 0.5); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20 },
+		"v05fixk10": func(p *Params) { bunker(p, 40, 0.2); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 1500, 20, 30 },
+		"v05fixk11": func(p *Params) { bunker(p, 80, 0.5); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20 },
+		"v05fixqd6": func(p *Params) { quietGround(p); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20 },
+		// the published gated builds, for the local identity checks: gg-c with the gate at the cutoff
+		// (closed until then: must play exactly as gp:hunt+quiet3.0), gg-open with a gate that is open
+		"gg-c": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", 1795363200
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk9", "ffa-fixrf9", 60, gateDoubtS
+		},
+		"gg-open": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", nowUnix()-60
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk9", "ffa-fixrf9", 60, gateDoubtS
+		},
+		// (the same without the second thoughts, to see what they are worth against the squad)
+		"gg-open0": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", nowUnix()-60
+			p.GateSwap, p.GateLate, p.GateLateT = "v05fixk9", "ffa-fixrf9", 60
+		},
+		"x-g0k9l60": func(p *Params) { gateTest(p, "v05fixk9", 60) },
+		"x-g0k9l45": func(p *Params) { gateTest(p, "v05fixk9", 45) },
+		"x-g0k11":   func(p *Params) { gateTest(p, "v05fixk11", 60) },
+		"x-g0d6":    func(p *Params) { gateTest(p, "v05fixqd6", 50) },
+		// no gate: the same quiet sets from detection on (what a build without FFAFrom plays)
+		"x-hk9":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet, p.FFASwap, p.FFALateT = "sq-hunt", "o-quiet3", "v05fixk9", 60 },
+		"x-hk11": func(p *Params) { pfx(p); p.SquadSet, p.OpenSet, p.FFASwap, p.FFALateT = "sq-hunt", "o-quiet3", "v05fixk11", 60 },
+		"x-hd6":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet, p.FFASwap = "sq-hunt", "o-quiet3", "v05fixqd6" },
+		"x-g0k6":    func(p *Params) { gateTest(p, "v05fixk6", 75) },
+		"x-g0k7":    func(p *Params) { gateTest(p, "v05fixk7", 75) },
+		"x-g0k8":    func(p *Params) { gateTest(p, "v05fixk8", 75) },
+		"x-g0k9":    func(p *Params) { gateTest(p, "v05fixk9", 75) },
+		"x-g0k10":   func(p *Params) { gateTest(p, "v05fixk10", 75) },
+		"x-g0k1": func(p *Params) { gateTest(p, "v05fixk1", 75) },
+		"x-g0k2": func(p *Params) { gateTest(p, "v05fixk2", 75) },
+		"x-g0k3": func(p *Params) { gateTest(p, "v05fixk3", 75) },
+		"x-g0k4": func(p *Params) { gateTest(p, "v05fixk4", 75) },
+		"x-g0k5": func(p *Params) { gateTest(p, "v05fixk5", 75) },
+		// around the ground-only quiet set (qd), the best of the first round in the re-enactment
+		"v05fixqd1": func(p *Params) { quietGround(p); p.ArmRadius = 60 },
+		"v05fixqd2": func(p *Params) {
+			quietGround(p)
+			p.ShySecs, p.ShyRange, p.ShyLaser, p.ShyMem, p.ShyBoost = 25, 220, 60, 6, 40
+		},
+		"v05fixqd3": func(p *Params) { quietGround(p); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 300, 12, 20 },
+		"v05fixqd4": func(p *Params) { quietGround(p); p.FFALootRadius = 80 },
+		"v05fixqd5": func(p *Params) { quietGround(p); p.EdgeBias, p.EdgeBand = 0, 0 },
+		"x-g0d1":    func(p *Params) { gateTest(p, "v05fixqd1", 50) },
+		"x-g0d2":    func(p *Params) { gateTest(p, "v05fixqd2", 50) },
+		"x-g0d3":    func(p *Params) { gateTest(p, "v05fixqd3", 50) },
+		"x-g0d4":    func(p *Params) { gateTest(p, "v05fixqd4", 50) },
+		"x-g0d5":    func(p *Params) { gateTest(p, "v05fixqd5", 50) },
+		"x-g0dl35":  func(p *Params) { gateTest(p, "v05fixqd", 35) },
+		"x-g0dl70":  func(p *Params) { gateTest(p, "v05fixqd", 70) },
+		"x-g0b1": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet3"; p.ForceFFA = true; p.FFASwap = "v05fixb1" },
+		"x-g0b2": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet3"; p.ForceFFA = true; p.FFASwap = "v05fixb2" },
+		"x-g0b3": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet3"; p.ForceFFA = true; p.FFASwap = "v05fixb3" },
+		"x-g0b3l": func(p *Params) {
+			pfx(p)
+			p.SquadSet, p.OpenSet, p.ForceFFA, p.FFASwap, p.FFALateT = "sq-hunt", "o-quiet3", true, "v05fixb3", 75
+		},
+		"x-g0":  func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet3"; p.ForceFFA = true },
+		"x-g0s": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet3"; p.ForceFFA = true; p.FFASwap = "v05fixq9s" },
+		"x-g0d": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet3"; p.ForceFFA = true; p.FFASwap = "v05fixqd" },
+		"x-g0e": func(p *Params) { pfx(p); p.SquadSet = "sq-hunt"; p.OpenSet = "o-quiet3"; p.ForceFFA = true; p.FFASwap = "v05fixqe" },
+		"x-g0c": func(p *Params) {
+			pfx(p)
+			p.SquadSet, p.OpenSet, p.ForceFFA = "sq-hunt", "o-quiet3", true
+			p.FFASwap, p.FFALate = "ffa-fixc9", ""
+		},
 		"gp-hq":    func(p *Params) { pfx(p); p.SlotPlan = "hunt+quiet.0,hunt+quiet.0,hunt+quiet.0,hunt+quiet.0" },
 		// the plans of v0.55, v0.58 and of their composite v0.67, for the local identity checks
 		"gp-c55": func(p *Params) { pfx(p); p.SlotPlan = "hunt+quiet.0,hunt.0,hunt.0,hunt.0" },
@@ -621,6 +741,35 @@ func v05(p *Params) {
 
 // pfx is the base of the practice experiments: v0.7.4 until the lobby is known, then (free-for-all) the
 // v0.13 play without mortars.
+// bunker is the quiet set that stays by the spawn: on the ground, no roaming, a weapon or loot only
+// within reach metres, and hideouts weighed at distW points per metre of travel.
+func bunker(p *Params, reach, distW float64) {
+	v05(p)
+	p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+	p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 0, 0
+	p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+	p.UseRoofs, p.NoStealthRoam = false, true
+	p.ArmRadius, p.FFALootRadius = reach, reach
+	p.HideNearW = distW
+}
+
+// quietGround is the ground-only quiet set (v05fixqd): no roof climb, no walking about for a weapon.
+func quietGround(p *Params) {
+	v05(p)
+	p.PathFix, p.CreditFix, p.NoMortarHard, p.StealthQuiet = true, true, true, true
+	p.HostileMem, p.RetreatPest, p.EdgeBias, p.EdgeBand = 30, true, 3, 0.75
+	p.ClimbCheckAll, p.ClimbClearMem, p.ClimbClearRange = true, 4, 170
+	p.UseRoofs, p.NoStealthRoam = false, true
+}
+
+// gateTest is a build whose gate is open: a free-for-all from the first tick, with swap as the quiet
+// set until lateT (for the local tools; a published build gets there through FFAFrom).
+func gateTest(p *Params, swap string, lateT float64) {
+	pfx(p)
+	p.SquadSet, p.OpenSet, p.ForceFFA = "sq-hunt", "o-quiet3", true
+	p.FFASwap, p.FFALateT = swap, lateT
+}
+
 func pfx(p *Params) {
 	v074(p)
 	// (from v0.67 on the quiet phase after detection also holds its fire until touched: v05fixq; from
