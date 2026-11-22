@@ -137,6 +137,9 @@ func (b *Bot) think(act *proto.Action) {
 		if th.tr.ID == b.targetID {
 			s *= 1.2
 		}
+		if b.P.FinishStick > 0 && b.squadOn && th.tr.MaxHP > 0 && th.tr.HP > 0 && th.tr.HP < b.P.FinishFrac*th.tr.MaxHP && th.d < b.P.FinishRange {
+			s *= b.P.FinishStick // (the one nearly down first, wherever the others stand)
+		}
 		if s > bestS {
 			bestS, tgt = s, th
 		}
@@ -263,6 +266,14 @@ func (b *Bot) think(act *proto.Action) {
 	}
 	// never walk away from a kill that is one burst from done
 	if tgt != nil && tgt.tr.LOS && tgt.tr.Listed && tgt.tr.HP > 0 && tgt.tr.HP < b.myDPS(tgt.d)*1.2+40 && hpFrac > 0.12 {
+		b.retreating = false
+	}
+	// FinishFrac (practice stance): ... nor from one we have already taken most of the way down. In the
+	// emulated matches that end with three kills or fewer we deal two to three times the usual damage
+	// per kill: hunters left at a tenth or a fifth of their health when we fell back or turned to the
+	// next one, each of them a point.
+	if b.P.FinishFrac > 0 && st.name == "squad" && tgt != nil && tgt.tr.LOS && tgt.tr.Listed && tgt.tr.HP > 0 &&
+		tgt.tr.HP < b.P.FinishFrac*math.Max(tgt.tr.MaxHP, 1) && tgt.d < b.P.FinishRange && hpFrac > b.P.FinishMinHP {
 		b.retreating = false
 	}
 

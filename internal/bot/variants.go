@@ -550,6 +550,28 @@ func Variants() map[string]func(p *Params) {
 			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200
 			p.PatientSecs, p.PatientCubes, p.PatientRange = 150, 12, 40
 		},
+		// Finish (practice): fin1: no retreat while a target in sight inside 120 m is under 30% and we are
+		// over 25%; fin2: and that target first (three times the weight); fin3: fin2 at 40% / 150 m / 20%.
+		"sq-fin1": func(p *Params) {
+			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200
+			p.FinishFrac, p.FinishRange, p.FinishMinHP = 0.3, 120, 0.25
+		},
+		"sq-fin2": func(p *Params) {
+			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200
+			p.FinishFrac, p.FinishRange, p.FinishMinHP, p.FinishStick = 0.3, 120, 0.25, 3
+		},
+		"sq-fin3": func(p *Params) {
+			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200
+			p.FinishFrac, p.FinishRange, p.FinishMinHP, p.FinishStick = 0.4, 150, 0.2, 3
+		},
+		"sq-fin4": func(p *Params) {
+			p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200
+			p.FinishFrac, p.FinishRange, p.FinishMinHP, p.FinishStick = 0.3, 120, 1.1, 3
+		},
+		"x-fin1":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-fin1", "o-quiet3" },
+		"x-fin2":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-fin2", "o-quiet3" },
+		"x-fin3":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-fin3", "o-quiet3" },
+		"x-fin4":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-fin4", "o-quiet3" },
 		"x-pat1":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-pat1", "o-quiet3" },
 		"x-pat2":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-pat2", "o-quiet3" },
 		"x-pat3":  func(p *Params) { pfx(p); p.SquadSet, p.OpenSet = "sq-pat3", "o-quiet3" },
