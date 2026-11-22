@@ -1075,6 +1075,11 @@ var gatePlans = []string{
 	"qC+quiet3.0",    // p
 	"qD+quiet3.0",    // q
 	"qE+quiet3.0",    // r
+	"hO+quiet3.0",    // s
+	"hP+quiet3.0",    // t
+	"fD+quiet3.0",    // u
+	"fC+quiet3.0",    // v
+	"fE+quiet3.0",    // w
 }
 
 var huntSweep = map[string]func(p *Params){
@@ -1163,6 +1168,44 @@ var huntSweep = map[string]func(p *Params){
 	"rK": func(p *Params) { seek3(p); stand(p); p.UpOffense = 0.2 },
 	"rL": func(p *Params) { seek3(p); stand(p); p.HuntRange, p.HuntRangeLaser = 300, 320 },
 	"rM": func(p *Params) { seek3(p); stand(p); p.ReturnHP = 0 },
+	// Fortress (Sunday 08:55): officially, going after the squad (seek) scores no better than waiting
+	// for it (hunt), so the opposite: wait far from every mech we know of, kill the hunters as they
+	// arrive, let the health come back in between. fA: no hunting at all; fB: and no farming; fC: fA
+	// and never retreat; fD: hunting only close by; fE: the hunt stance, only waiting far away; fF: fE
+	// healing first.
+	"fA": func(p *Params) { fort(p); p.Hunt = false },
+	"fB": func(p *Params) { fort(p); p.Hunt = false; p.NoFarm = true },
+	"fC": func(p *Params) { fort(p); p.Hunt = false; stand(p) },
+	"fD": func(p *Params) { fort(p); p.HuntRange, p.HuntRangeLaser = 70, 90 },
+	"fE": func(p *Params) { p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20 },
+	"fF": func(p *Params) {
+		p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20
+		p.HealFirst, p.HealUntil = 0.8, 0.97
+	},
+}
+
+// Lightning in practice (Sunday 09:00). The rulebook: 60 a shot every 0.25 s on the nearest target
+// inside 45 m with no aiming, chaining to two more within 14 m, against 45 every 0.24 s with a reload
+// for the gun and 315 every 2.4 s for a laser; and the hunters come to us. The base set values a laser
+// at 6 and lightning at 2.6 for pickups and swaps.
+func init() {
+	huntSweep["lA"] = func(p *Params) { p.LightningValue = 9 }
+	huntSweep["lB"] = func(p *Params) { p.LightningValue, p.LaserValue = 9, 3 }
+	huntSweep["lC"] = func(p *Params) { p.LightningValue = 0.5 }
+	huntSweep["lD"] = func(p *Params) { p.LightningValue = 9; stand(p) }
+	huntSweep["lE"] = func(p *Params) { p.LightningValue, p.ArmSwapMin = 9, 0.2 }
+	huntSweep["lF"] = func(p *Params) { p.LaserValue = 0.5 }
+	// laser hunger (see chooseLoot): farther for a laser, crates for a laser, both, more of both
+	// (Tried and removed with their code, 09:10: going farther for a laser and breaking crates for one
+	// changed nothing, 5.56-5.60 against 5.57; a laser and lightning with the gun dropped lost 0.3.
+	// Emulated practice by what we hold 30 s in: gun + laser 6.0 kills, gun + lightning 5.3, gun 4.3.)
+}
+
+// fort: wait far from the mechs we know of, no cube farming, little looting, heal before anything else.
+func fort(p *Params) {
+	p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20
+	p.WantCubes, p.LootRadius = 0, 80
+	p.HealFirst, p.HealUntil = 0.9, 0.98
 }
 
 // stand: never retreat from the squad (it follows anyway).
