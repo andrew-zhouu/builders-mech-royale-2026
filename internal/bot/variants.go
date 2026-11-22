@@ -414,6 +414,12 @@ var huntSweep = map[string]func(p *Params){
 		p.HuntRange, p.HuntRangeLaser = 230, 260
 	},
 	"hN8": func(p *Params) { p.EngageRatio, p.Seek, p.WantCubes, p.HouseModel = 0.6, 30, 6, true },
+	// supply drops in practice: break off for the full repair (hd: when hurt, within 260 m; hd2: from
+	// farther and whatever our health; hd3: setting off earlier; hd4: only when clearly hurt)
+	"hd":  func(p *Params) { p.DropRun = 260 },
+	"hd2": func(p *Params) { p.DropRun, p.DropRunHP = 420, 1.01 },
+	"hd3": func(p *Params) { p.DropRun, p.DropRunLead = 420, 10 },
+	"hd4": func(p *Params) { p.DropRun, p.DropRunHP = 420, 0.6 },
 	"hO": func(p *Params) { p.RoofInSquad = true },
 	"hP": func(p *Params) { p.KiteMin, p.KiteMax = 90, 150 },
 }

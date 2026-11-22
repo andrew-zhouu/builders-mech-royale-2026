@@ -512,6 +512,7 @@ func (b *Bot) think(act *proto.Action) {
 	if b.roof.state == roofApproach && b.t-b.roof.stepT > 2.5 {
 		b.roof.state = roofNone
 	}
+	dropGo := b.dropRun(st, hpFrac)
 
 	switch {
 	case zi.critical || (zi.urgent && (!wantFight || tgt == nil || tgt.d > 60)) || (zi.urgent && zi.tPass < 5):
@@ -537,6 +538,22 @@ func (b *Bot) think(act *proto.Action) {
 		b.mode = "climb"
 		b.roofClimbStep(act)
 		direct = true
+
+	case dropGo != nil:
+		// (practice stance, DropRun) the supply drop first: the fight comes along
+		b.mode = "drop-run"
+		b.lootID = dropGo.ID
+		if d := dist2(b.pos, dropGo.Pos); d > 4.5 {
+			setGoal(dropGo.Pos[0], dropGo.Pos[1], 2.6, b.energy > 30 && d > 25 && (underFire || dropGo.LandsIn < d/b.walk))
+			if !goalOK {
+				b.banUntil[dropGo.ID] = b.t + 20
+			}
+		} else {
+			// in the ring: stay in it
+			b.mode = "drop-hold"
+			rq.wantW = 0
+			rq.hold = true
+		}
 
 	case peek:
 		// laser fight from behind cover: hidden while charging and cooling, out for the shot
@@ -1267,6 +1284,42 @@ func (b *Bot) roamTarget(st stance, hpFrac float64) (float64, float64, bool) {
 		return 0, 0, false
 	}
 	return b.roamGoal()
+}
+
+// dropRun (DropRun > 0, the practice stance only): a supply drop worth breaking off for. Four seconds
+// alone in its ring are full health, full energy and three cubes: with the house squad on us that is a
+// second life, and the first one lands at 95 s, about when our practice matches end. The legs go there;
+// the torso keeps fighting. Returns nil when there is none in reach, it is too early to set off, or we
+// are healthy and at the cube cap.
+func (b *Bot) dropRun(st stance, hpFrac float64) *proto.DropObs {
+	if b.P.DropRun <= 0 || st.name != "squad" {
+		return nil
+	}
+	if hpFrac > b.P.DropRunHP && b.o.Self.Cubes >= 10 {
+		return nil
+	}
+	var best *proto.DropObs
+	bd := 1e18
+	for i := range b.o.Drops {
+		dr := &b.o.Drops[i]
+		if until, banned := b.banUntil[dr.ID]; banned && b.t < until {
+			continue
+		}
+		d := dist2(b.pos, dr.Pos)
+		if d > b.P.DropRun {
+			continue
+		}
+		if dr.LandsIn > d/b.walk*1.25+b.P.DropRunLead {
+			continue
+		}
+		if !b.inFutureZone(dr.Pos[0], dr.Pos[1], d/b.walk+6, 4) {
+			continue
+		}
+		if d < bd {
+			best, bd = dr, d
+		}
+	}
+	return best
 }
 
 // seekTarget (Seek > 0, the practice stance only): with nothing to pick up and health to spare, where to

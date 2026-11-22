@@ -44,6 +44,9 @@ type Params struct {
 	NpcGiveUp     float64 // the same for a drone we are trying to shoot
 	QuietSlip     bool    // going for cover from a mech that has not hurt us: hold fire (unless we hold a laser against none)
 	QuietSlipMin  float64 // ... but not inside this range, where it cannot be avoided anyway
+	DropRun       float64 // practice stance: break off for a supply drop within this many metres (0 = only when idle, as before)
+	DropRunHP     float64 // ... when our health is below this fraction (or we have fewer than 10 cubes)
+	DropRunLead   float64 // ... setting off this many seconds before we would need to in order to be there as it lands
 	OpenAway      float64 // lobby not known yet: loot that takes us 15 m+ closer to a known mech is worth this much less (0..1)
 	ShyOpen       bool    // the shy opening rule (ShySecs) also while the lobby is not known yet
 	StealthQuiet  bool    // stealth stances: do not open fire on a mech that has only turned our way (hold fire until touched)
@@ -168,7 +171,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gp:hunt+quiet.0,hunt.0,hunt.0,hN2+quiet.2,hunt+quiet.0,hunt.0,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt.0,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt.0,hunt.0,hunt+quiet.0"
+var BuildVariant = "gp:hunt+quiet.0,hunt.0,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt.0,hunt.0,hunt+quiet.2,hunt+quiet.0,hunt.0,hunt.0,hunt+quiet.0,hunt+quiet.0,hunt.0,hunt.0,hunt+quiet.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -243,6 +246,8 @@ func baseParams() Params {
 		DropGreed:     0.5,
 		Hunt:          true,
 		PracticeAware: true,
+		DropRunHP:     0.85,
+		DropRunLead:   4,
 		HuntHP:        0.6,
 		SeekRange:     320,
 		SeekHP:        0.7,
@@ -1096,6 +1101,10 @@ func (b *Bot) observe(o *proto.Obs) {
 			}
 		case "took":
 			delete(b.pickups, e.ID.Num)
+		case "drop":
+			if Stats {
+				fmt.Fprintf(os.Stderr, "[drop] t=%.1f hp before=%.0f of %.0f cubes=%d alive=%d stance=%s\n", b.t, b.hp, b.maxHP, e.Cubes, o.Alive, b.st.name)
+			}
 		case "take_failed":
 			if e.Reason == "gone" || e.Reason == "have" {
 				delete(b.pickups, e.ID.Num)
