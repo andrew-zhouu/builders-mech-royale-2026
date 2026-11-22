@@ -448,6 +448,28 @@ func Variants() map[string]func(p *Params) {
 			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk12", "ffa-fixrf9", 60, gateDoubtS
 			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
 		},
+		// k13 = k12 + out of a laser's sight at once when we hold none (LaserRespect), and a mech that
+		// hurt us stays a pair of eyes for 30 s (ThreatMem)
+		"v05fixk13": func(p *Params) {
+			bunker(p, 80, 0.5)
+			p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20
+			p.DropStick = true
+			p.LaserRespect, p.ThreatMem = 60, 30
+		},
+		"gg-open3": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", nowUnix()-60
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk13", "ffa-fixrf9", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		"gg-c3": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", 1795363200
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk13", "ffa-fixrf9", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		"x-g0k13":   func(p *Params) { gateTest(p, "v05fixk13", 60) },
+		"x-g0k13a4": func(p *Params) { gateTest(p, "v05fixk13", 240); p.FFALateAlive = 4 },
 		"x-g0k12":   func(p *Params) { gateTest(p, "v05fixk12", 60) },
 		"x-g0k12a4": func(p *Params) { gateTest(p, "v05fixk12", 240); p.FFALateAlive = 4 },
 		"v05fixqd6": func(p *Params) { quietGround(p); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20 },

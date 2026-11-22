@@ -410,6 +410,17 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 	// we know of. In the real matches (4 PM to midnight Saturday) the two teams with the best
 	// free-for-all records stood at 0.6-0.7 of the zone radius from its centre at 90-120 s and 140-200 m
 	// from the nearest mech; everyone else, we included, at 0.4-0.55 and 100-135 m.
+	// ThreatMem: nothing that lies in the sight of a mech that has just hurt us (from where we last saw it)
+	var threatEyes [][3]float64
+	if b.P.ThreatMem > 0 && (st.avoid || st.stealth) {
+		for _, tr := range b.tracks {
+			if tr.NPC || tr.HurtMeT <= 0 || b.t-tr.HurtMeT >= b.P.ThreatMem || tr.LastSeen <= 0 {
+				continue
+			}
+			sc := tr.scale(b.sizePerCube)
+			threatEyes = append(threatEyes, [3]float64{tr.Pos[0], tr.Pos[1], tr.Pos[2] + 8*sc})
+		}
+	}
 	var edgeMechs [][3]float64
 	if b.P.EdgeBias > 0 && b.ffa {
 		for _, tr := range b.tracks {
@@ -484,6 +495,11 @@ func (b *Bot) chooseLoot(danger bool, st stance) *loot {
 		}
 		if !b.reachable(l.pos[0], l.pos[1]) {
 			return
+		}
+		for _, e := range threatEyes {
+			if hyp(e[0]-l.pos[0], e[1]-l.pos[1]) < 270 && b.W.Visible(e[0], e[1], e[2], l.pos[0], l.pos[1], l.pos[2]+4.5) {
+				return
+			}
 		}
 		if st.stealth {
 			// in the open is where we get shot: discount exposed loot

@@ -230,6 +230,23 @@ func (b *Bot) think(act *proto.Action) {
 			leave = false // (see above: running is only worth it with cover seconds away)
 			b.standT = b.t
 		}
+		// LaserRespect (stealth stances): a laser on us from range and none in our hands is not a duel
+		// to wait out. (The showdown after the leaderboard reset: 9 of our 11 deaths were to lasers from
+		// 90-200 m, six of them with only a gun or lightning to answer with; a laser does three times
+		// what our gun does at that range and three hits are a mech.) Out of its sight at once.
+		// (Only with somewhere to go: a hurt mech still in its attacker's sight 8 s later lived 34% of
+		// the time when it stood and shot back and 10% when it only ran.)
+		if b.P.LaserRespect > 0 && st.stealth && tgt != nil && tgt.engaged && tgt.tr.Laser && b.has("laser") < 0 &&
+			tgt.d > b.P.LaserRespect && b.t-tgt.tr.HurtMeT < 4 &&
+			!(tgt.tr.LOS && tgt.tr.HP > 0 && tgt.tr.HP < b.myDPS(tgt.d)*1.5+60) {
+			if b.t-b.respectT > 0.5 {
+				b.respectT = b.t
+				b.respectOK = b.findCover(ths, 70) >= 0
+			}
+			if b.respectOK {
+				leave = true
+			}
+		}
 		if leave {
 			b.retreating = true
 			b.retreatT = b.t

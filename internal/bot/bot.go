@@ -51,6 +51,8 @@ type Params struct {
 	KeepAway      float64 // hide choice: cost of one known mech at point blank, falling off with distance (0 = off; see chooseHide)
 	KeepAwayMem   float64 // ... mechs seen and weapons heard this many seconds ago still count
 	KeepAwayStay  float64 // ... and the place we already hold is this much better than its score says
+	LaserRespect  float64 // stealth stances: hit by a laser from beyond this range with none of our own, break its line of sight at once (0 = off)
+	ThreatMem     float64 // a mech that hurt us counts as watching from where we last saw it for this long (hide and loot choice; 0 = off)
 	ClimbCheckAll bool    // the no-climb-in-someone's-sight rules in every stance, not only the brawl stances
 	ClimbClearMem float64 // ... counting mechs seen in the last this many seconds inside ClimbClearRange (0 = only those in view now)
 	EdgeBias      float64 // free-for-all sets: prefer hideouts, roofs and loot out towards the edge of the next circle and away from known mechs (0 = off)
@@ -208,7 +210,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gg:1795363200:v05fixk12:ffa-fixrf9:60x240a4:hunt+quiet3.3"
+var BuildVariant = "gg:1795363200:v05fixk13:ffa-fixrf9:60x240a4:hunt+quiet3.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -643,6 +645,8 @@ type Bot struct {
 	deepTryT   float64 // ... when we last looked for one
 	gunSector   [12]int // SoundFFA: gun shots heard so far, by direction (30 degree sectors)
 	soundFFA    bool    // SoundFFA: the opening sounded like a free-for-all
+	respectT    float64 // LaserRespect: when we last looked for cover from a laser, and whether there was any
+	respectOK   bool
 	gateOn      bool    // the build's gate was open when the match began (see Params.FFAFrom)
 	gateOff     bool    // ... and has been overruled by the match itself (see Params.GateDoubt)
 	pUngated    Params  // the parameters without the gate
@@ -801,6 +805,7 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	b.coverCell = -1
 	b.deepCell, b.deepT, b.deepTryT = -1, -100, -100
 	b.nearCoverT = -100
+	b.respectT = -100
 	b.standT = -100
 	b.creditAbsorbT = -100
 	b.holdCell = -1

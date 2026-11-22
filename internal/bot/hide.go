@@ -228,17 +228,25 @@ func (b *Bot) chooseHide(zi zoneInfo) int {
 		gz := float64(b.Nav.Z[c.cell])
 		s := c.score
 		for _, tr := range b.tracks {
-			if tr.NPC || b.t-tr.LastSeen > 25 {
+			// ThreatMem: a mech that has hurt us stays a pair of eyes at the place we last saw it for
+			// that long, seen since or not. (A real match: hit twice by a laser from 234 m, out of its
+			// sight for eight seconds, then back into the same line of fire and dead.)
+			// (only one we have actually seen: a track made by a hit from nowhere has no place)
+			hurt := b.P.ThreatMem > 0 && !tr.NPC && tr.HurtMeT > 0 && b.t-tr.HurtMeT < b.P.ThreatMem && tr.LastSeen > 0
+			if tr.NPC || (b.t-tr.LastSeen > 25 && !hurt) {
 				continue
 			}
 			d := hyp(tr.Pos[0]-x, tr.Pos[1]-y)
 			if d < 90 {
 				s += (90 - d) * 0.35
 			}
-			if d < 260 && b.t-tr.LastSeen < 8 {
+			if d < 260 && (b.t-tr.LastSeen < 8 || hurt) {
 				sc := tr.scale(b.sizePerCube)
 				if b.W.Visible(tr.Pos[0], tr.Pos[1], tr.Pos[2]+8*sc, x, y, gz+b.height*0.6) {
 					s += 30
+					if hurt {
+						s += 60
+					}
 				}
 			}
 		}
