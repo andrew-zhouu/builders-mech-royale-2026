@@ -200,7 +200,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gg:1795341600:v05fixk9:ffa-fixrf9:60:hunt+quiet3.2"
+var BuildVariant = "gg:1795341600:v05fixk9:ffa-fixrf9:60:hunt+quiet3.3"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
