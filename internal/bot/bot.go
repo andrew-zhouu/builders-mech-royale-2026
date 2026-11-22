@@ -78,6 +78,7 @@ type Params struct {
 	SoundFFAUntil float64 // ... heard before this match time
 	FFALate       string  // variant applied (to the set FFASwap started from) once FFALateT has passed in a free-for-all ("" = none)
 	FFALateT      float64
+	FFALateAlive  int     // ... or once no more than this many mechs are alive (0 = by the clock only)
 	FFASwap       string  // variant to switch to once the lobby is known to be a free-for-all ("" = none)
 	OpenSet       string  // variant in force from the start until the lobby is known or assumed ("" = none)
 	SquadSet      string  // variant in force while the lobby is taken to be practice ("" = none)
@@ -95,6 +96,13 @@ type Params struct {
 	GateSwap  string
 	GateLate  string
 	GateLateT float64
+	GateLateAlive int // (as FFALateAlive; in the build variant written "<late t>a<alive>")
+	// A second pair for the odd seats (build variant "<late t>a<alive>x<late t>a<alive>"; GateAlt false =
+	// one rule for every seat). Seats are drawn afresh for every match, so the two halves meet the same
+	// opponents: the real free-for-alls compare the two rules for us.
+	GateAlt        bool
+	GateLateT2     float64
+	GateLateAlive2 int
 	// GateDoubt: with the gate open, a match in which nobody has died by this time but mechs we killed
 	// (seconds; 0 = never doubt) is the house squad after all, and is played as practice from then on.
 	// Every recorded free-for-all has had a death inside 35 s; against the squad nobody dies but by us.
@@ -200,7 +208,7 @@ type Params struct {
 
 // BuildVariant names the variant a published build plays by default ("" = the base set as written
 // below). tools/variant_export.sh sets it for an export and puts it back.
-var BuildVariant = "gg:1795341600:v05fixk11:ffa-fixrf9:60:hunt+quiet3.7"
+var BuildVariant = "gg:1795341600:v05fixk12:ffa-fixrf9:60x240a4:hunt+quiet3.0"
 
 // DefaultParams is what the bot plays with: the base set, with the build's variant applied if any.
 func DefaultParams() Params {
@@ -212,7 +220,13 @@ func DefaultParams() Params {
 			pfx(&p)
 			p.FFAFrom, _ = strconv.ParseInt(f[0], 10, 64)
 			p.GateSwap, p.GateLate = f[1], f[2]
-			p.GateLateT, _ = strconv.ParseFloat(f[3], 64)
+			lt := f[3]
+			if i := strings.Index(lt, "x"); i >= 0 {
+				p.GateAlt = true
+				p.GateLateT2, p.GateLateAlive2 = parseLate(lt[i+1:])
+				lt = lt[:i]
+			}
+			p.GateLateT, p.GateLateAlive = parseLate(lt)
 			p.GateDoubt = gateDoubtS
 			p.SlotPlan = f[4]
 		}
@@ -270,9 +284,23 @@ func gateOpen(from, now int64) bool {
 	return from > 0 && now >= from && now < from+gateWindow
 }
 
+// parseLate reads "<seconds>" or "<seconds>a<alive>" (see FFALateT, FFALateAlive).
+func parseLate(s string) (float64, int) {
+	alive := 0
+	if i := strings.Index(s, "a"); i >= 0 {
+		alive, _ = strconv.Atoi(s[i+1:])
+		s = s[:i]
+	}
+	t, _ := strconv.ParseFloat(s, 64)
+	return t, alive
+}
+
 // applyGate is what an open gate does to the parameters: a free-for-all from the first tick, with the
-// gate's own sets where it names any.
-func applyGate(p Params) Params {
+// gate's own sets where it names any (odd seats: the second late rule, where the build has one).
+func applyGate(p Params, slot int) Params {
+	if p.GateAlt && slot%2 != 0 {
+		p.GateLateT, p.GateLateAlive = p.GateLateT2, p.GateLateAlive2
+	}
 	p.ForceFFA = true
 	if p.GateSwap != "" {
 		p.FFASwap = p.GateSwap
@@ -282,6 +310,9 @@ func applyGate(p Params) Params {
 	}
 	if p.GateLateT > 0 {
 		p.FFALateT = p.GateLateT
+	}
+	if p.GateLateAlive > 0 {
+		p.FFALateAlive = p.GateLateAlive
 	}
 	return p
 }
@@ -734,7 +765,7 @@ func New(h *proto.Hello, w *world.World, nav *world.Nav, p Params) *Bot {
 	ungated := p
 	gate := gateOpen(p.FFAFrom, nowUnix())
 	if gate {
-		p = applyGate(p)
+		p = applyGate(p, h.Slot)
 	}
 	b := &Bot{P: p, H: h, C: &h.Config, W: w, Nav: nav}
 	b.gateOn, b.pUngated = gate, ungated

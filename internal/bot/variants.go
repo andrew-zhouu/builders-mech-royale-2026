@@ -428,6 +428,28 @@ func Variants() map[string]func(p *Params) {
 		"v05fixk9":  func(p *Params) { bunker(p, 60, 0.5); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20 },
 		"v05fixk10": func(p *Params) { bunker(p, 40, 0.2); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 1500, 20, 30 },
 		"v05fixk11": func(p *Params) { bunker(p, 80, 0.5); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20 },
+		// k12 = k11 that, once on its way to a supply drop, stays on it (re-enacted, k11 turned between
+		// "hold" and the drop four times a match: the "not yet" rule, see DropStick)
+		"v05fixk12": func(p *Params) {
+			bunker(p, 80, 0.5)
+			p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20
+			p.DropStick = true
+		},
+		// the published two-rule build with its gate open and closed, for the local checks
+		"gg-open2": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", nowUnix()-60
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk12", "ffa-fixrf9", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		"gg-c2": func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", 1795363200
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateDoubt = "v05fixk12", "ffa-fixrf9", 60, gateDoubtS
+			p.GateAlt, p.GateLateT2, p.GateLateAlive2 = true, 240, 4
+		},
+		"x-g0k12":   func(p *Params) { gateTest(p, "v05fixk12", 60) },
+		"x-g0k12a4": func(p *Params) { gateTest(p, "v05fixk12", 240); p.FFALateAlive = 4 },
 		"v05fixqd6": func(p *Params) { quietGround(p); p.KeepAway, p.KeepAwayMem, p.KeepAwayStay = 800, 20, 20 },
 		// the published gated builds, for the local identity checks: gg-c with the gate at the cutoff
 		// (closed until then: must play exactly as gp:hunt+quiet3.0), gg-open with a gate that is open
@@ -447,6 +469,14 @@ func Variants() map[string]func(p *Params) {
 			p.SlotPlan, p.FFAFrom = "hunt+quiet3.0", nowUnix()-60
 			p.GateSwap, p.GateLate, p.GateLateT = "v05fixk9", "ffa-fixrf9", 60
 		},
+		// ... staying in the keep-away set until few are left (or a late hour)
+		"x-g0k11a6": func(p *Params) { gateTest(p, "v05fixk11", 240); p.FFALateAlive = 6 },
+		"x-g0k11a4": func(p *Params) { gateTest(p, "v05fixk11", 240); p.FFALateAlive = 4 },
+		"x-g0k11a3": func(p *Params) { gateTest(p, "v05fixk11", 300); p.FFALateAlive = 3 },
+		"x-g0k11l90":  func(p *Params) { gateTest(p, "v05fixk11", 90) },
+		"x-g0k11l120": func(p *Params) { gateTest(p, "v05fixk11", 120) },
+		"x-g0k11l180": func(p *Params) { gateTest(p, "v05fixk11", 180) },
+		"x-g0k11l300": func(p *Params) { gateTest(p, "v05fixk11", 300) },
 		"x-g0k9l60": func(p *Params) { gateTest(p, "v05fixk9", 60) },
 		"x-g0k9l45": func(p *Params) { gateTest(p, "v05fixk9", 45) },
 		"x-g0k11":   func(p *Params) { gateTest(p, "v05fixk11", 60) },

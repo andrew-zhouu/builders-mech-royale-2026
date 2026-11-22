@@ -86,7 +86,10 @@ func (b *Bot) think(act *proto.Action) {
 			st = b.belief()
 		}
 	}
-	if b.swapped && !b.lateDone && b.P.FFALate != "" && b.t >= b.P.FFALateT {
+	// (FFALateAlive: or once no more than that many mechs are left, whatever the clock says. In the
+	// showdown after the leaderboard reset the lobby is down to six by 120 s and to three or four by
+	// 180 s: outlasting the brawl is worth more places than joining it.)
+	if b.swapped && !b.lateDone && b.P.FFALate != "" && (b.t >= b.P.FFALateT || (b.P.FFALateAlive > 0 && b.o.Alive <= b.P.FFALateAlive)) {
 		// ... and a second set for the rest of the match, once the opening is behind us
 		b.lateDone = true
 		if f := Variants()[b.P.FFALate]; f != nil {
