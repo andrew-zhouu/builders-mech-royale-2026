@@ -1034,7 +1034,41 @@ func Variants() map[string]func(p *Params) {
 		m["sq-"+name] = func(p *Params) { p.EngageRatio, p.HuntRange, p.HuntRangeLaser = 0.9, 180, 200; f(p) }
 		m["x-"+name] = func(p *Params) { pfx(p); p.SquadSet = "sq-" + name }
 	}
+	// the gated final form (k29 in every seat until four are left) on other practice stances, for the
+	// local identity checks: "gg-o8<letter>" with the gate open (free-for-all play must not depend on
+	// the stance), "gg-c8<letter>" with the gate at the cutoff (practice play must be the plan's)
+	for i, plan := range gatePlans {
+		plan := plan
+		tag := string(rune('a' + i))
+		m["gg-o8"+tag] = func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = plan, nowUnix()-60
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateLateAlive, p.GateDoubt = "v05fixk29", "ffa-fixrf9z", 240, 4, gateDoubtS
+		}
+		m["gg-c8"+tag] = func(p *Params) {
+			pfx(p)
+			p.SlotPlan, p.FFAFrom = plan, 1795363200
+			p.GateSwap, p.GateLate, p.GateLateT, p.GateLateAlive, p.GateDoubt = "v05fixk29", "ffa-fixrf9z", 240, 4, gateDoubtS
+		}
+		m["gp-"+tag] = func(p *Params) { pfx(p); p.SlotPlan = plan }
+	}
 	return m
+}
+
+// gatePlans are the practice plans of the stance-diversity builds (a..): see the loop above.
+var gatePlans = []string{
+	"heal2+quiet3.0", // a
+	"fin2+quiet3.0",  // b
+	"hN3+quiet3.0",   // c
+	"hunt.0",         // d
+	"hD+quiet3.0",    // e
+	"heal1+quiet3.0", // f
+	"fin1+quiet3.0",  // g
+	"hK+quiet3.0",    // h
+	"hI+quiet3.0",    // i
+	"hF+quiet3.0",    // j
+	"hH+quiet3.0",    // k
+	"hC+quiet3.0",    // l
 }
 
 var huntSweep = map[string]func(p *Params){
